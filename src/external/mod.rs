@@ -1,1 +1,1 @@
-pub mod PCF8574_LCD;
+pub mod pcf8574_lcd;
