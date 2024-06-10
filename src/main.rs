@@ -8,6 +8,7 @@ use panic_halt as _;
 
 mod utils;
 mod peripherals;
+mod external;
 
 const RCC_BASE  : u32 = 0x4002_1000;
 const PCF8574_LCD_ADDRESS: u8 = 0x27;
@@ -33,6 +34,8 @@ fn main() -> ! {
 
         peripherals::i2c::init();
         peripherals::gpio::init();
+        external::PCF8574_LCD::lcd_init(PCF8574_LCD_ADDRESS);
+        
     }
 
     loop {
