@@ -1,6 +1,7 @@
 use crate::peripherals;
 use crate::utils;
 
+
 pub unsafe fn send_cmd ( address: u8, cmd: u8 ){
     let address_write:u8 = address << 1;
     let cmd_upper:u8 = (cmd & 0xF0);
