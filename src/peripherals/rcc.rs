@@ -35,7 +35,19 @@ impl RCC {
             while rcc_cr.read_volatile() & (1 << 1) == 0 {} // Wait until HSI is ready
         }
     }
-
+    pub fn read_cfgr(&self) -> u32 {
+        unsafe {
+            let rcc_cfgr = self.CFGR();
+            rcc_cfgr.read_volatile()
+        }
+    }
+    pub fn read_cr(&self) -> u32 {
+        unsafe {
+            let rcc_cr = self.CR();
+            rcc_cr.read_volatile()
+        }
+    }
+    
     pub fn set_sys_clock_32MHz(&self) {
         unsafe {
             // 1. Enable HSI and wait until it's ready
@@ -49,6 +61,7 @@ impl RCC {
             let rcc_cfgr = self.CFGR();
             let mut rcc_cfgr_val = rcc_cfgr.read_volatile();
             rcc_cfgr_val &= !(1 << 16); // PLLSRC: HSI/2
+            rcc_cfgr_val |= (0 << 16); // PLLSRC: HSI
             rcc_cfgr_val &= !(0b1111 << 18); // Clear PLLMUL bits
             rcc_cfgr_val |= (0b0110 << 18); // Set PLLMUL to 8 (4 MHz * 8 = 32 MHz)
             rcc_cfgr.write_volatile(rcc_cfgr_val);
@@ -66,8 +79,8 @@ impl RCC {
     
             // 5. Select PLL as system clock source
             rcc_cfgr_val = rcc_cfgr.read_volatile();
-            rcc_cfgr_val &= !(0b11 >> 0); // Clear SW bits
-            rcc_cfgr_val |= (0b10 >> 0); // Set SW to 0b10 (PLL selected as system clock)
+            rcc_cfgr_val = rcc_cfgr_val & !(0b11 << 0); // Clear SW bits
+            rcc_cfgr_val = rcc_cfgr_val | (0b10 << 0); // Set SW to 0b10 (PLL selected as system clock)
             rcc_cfgr.write_volatile(rcc_cfgr_val);
     
             // 6. Wait until PLL is used as the system clock source

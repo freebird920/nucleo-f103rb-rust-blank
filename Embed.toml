@@ -1,7 +1,9 @@
 [default.general]
 chip = "STM32F103RB"
+# halt_afterwards = true
 
+[default.rtt]
+enabled = true
 # [default.flash]
 # directory = "./target/thumbv7m-none-eabi/release"
-# halt_afterwards = true
 # reset_afterwards = true

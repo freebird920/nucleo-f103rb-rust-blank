@@ -27,9 +27,6 @@ impl FLASH {
                 flash_acr_val &= !(1 << 4); // Disable prefetch buffer
             }
             flash_acr.write_volatile(flash_acr_val);
-
-            // Wait until prefetch buffer is enabled/disabled
-            // 이 부분은 불필요할 수 있음. 대부분의 구현에서 해당 부분은 생략
         }
     }
 

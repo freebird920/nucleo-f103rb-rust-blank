@@ -9,3 +9,13 @@ edition = "2021"
 cortex-m = { version = "0.7.7", features = ["critical-section-single-core"] }
 cortex-m-rt = "0.7.3"
 panic-halt = "0.2.0"
+rtt-target = "0.5.0"
+
+[profile.dev]
+opt-level = 3  # 최적화 수준을 1로 설정 (기본값은 0)
+
+[profile.release]
+opt-level = 3  # 최적화 수준을 3로 설정 (기본값)
+
+# [features]
+# default = ["critical-section-cortex-m"]
