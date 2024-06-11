@@ -1,12 +1,15 @@
 #![no_std]
 #![no_main]
 #![allow(unused_parens)]
-// #![deny(unsafe_code)]
-use cortex_m;
+use cortex_m::asm::nop;
 use cortex_m_rt::entry;
 use panic_halt as _;
-use peripherals::{gpio::{GPIOx_BASE, GPIO}, tim_gp};
+use peripherals::{
+    gpio::{led_off, led_on, GPIOx_BASE, GPIO},
+    tim_gp,
+};
 use rtt_target::{rprintln, rtt_init_print};
+use utils::delay::{delay_sys_clk_ms, delay_sys_clk_us};
 
 mod external;
 mod peripherals;
@@ -15,18 +18,6 @@ mod utils;
 use crate::peripherals::rcc;
 
 const RCC_BASE: u32 = 0x4002_1000;
-// const PCF8574_LCD_ADDRESS: u8 = 0x27;
-// const RCC_APB2ENR:  *mut u32 = (RCC_BASE + 0x18) as *mut u32;
-// const RCC_APB1ENR:  *mut u32 = (RCC_BASE + 0x1C) as *mut u32;
-// const RCC_CR:       *mut u32 = (RCC_BASE + 0x00) as *mut u32;
-
-// unsafe fn rcc_hsion (){
-//     let mut rcc_cr_val: u32 = RCC_CR.read_volatile();
-//     rcc_cr_val |= (1 << 0);// HSION
-//     RCC_CR.write_volatile(rcc_cr_val);
-// }
-
-static mut TIM2_INSTANCE : Option<tim_gp::TIM_GP> = None;
 
 #[entry]
 fn main() -> ! {
@@ -42,7 +33,7 @@ fn main() -> ! {
         rcc.set_sys_clock_32MHz();
         let cr_val = rcc.read_cr();
         rprintln!("CR: {}", cr_val);
-        let cfgr_val =     rcc.read_cfgr();
+        let cfgr_val = rcc.read_cfgr();
         rprintln!("CFGR: {}", cfgr_val);
         rcc.APB1ENR_TIMxEN(rcc::TIMxEN::TIM2EN, true);
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPAEN, true);
@@ -53,20 +44,13 @@ fn main() -> ! {
         peripherals::gpio::init();
         rprintln!("GPIO initialized")
     }
-    let mut count = 0;
     loop {
-        count = count +1 ;
-        unsafe {
-            // count = count + 1;
-            // rprintln!("Loop count: {}", count);
-            // Check if button is pressed (PC13 is low)
-            if peripherals::gpio::read_button() == 0 {
-                peripherals::gpio::led_off();
-            } else {
-                peripherals::gpio::led_on();
-            }
-
-        }
-        // rprintln!("Loop count: {}", count);
+        // rprintln!("Echo ... ");
+        led_on();
+        delay_sys_clk_ms(1000);
+        rprintln!("Echo ... on ");
+        led_off();
+        delay_sys_clk_ms(1000);
+        rprintln!("Echo ... off");
     }
 }

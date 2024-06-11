@@ -89,7 +89,6 @@ dependencies = [
  "cortex-m-rt",
  "panic-halt",
  "rtt-target",
- "volatile-register",
 ]
 
 [[package]]

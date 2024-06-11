@@ -1,5 +1,3 @@
-
-use volatile_register::{RO, RW};
 pub enum GPIOx_BASE {
     A = 0x4001_0800,
     B = 0x4001_0C00,
@@ -36,20 +34,15 @@ impl GPIO {
         assert!(port < 16, "Port number must be between 0 and 15");
 
         let shift = (port % 8) * 4;
-        let cr_reg = if port < 8 {
-            self.CRL()
-        } else {
-            self.CRH()
-        };
+        let cr_reg = if port < 8 { self.CRL() } else { self.CRH() };
 
         let mut cr_val = cr_reg.read_volatile();
         cr_val &= !(0b1111 << shift); // Clear the current configuration
-        cr_val |= (cnf << shift);     // Set the configuration
+        cr_val |= (cnf << shift); // Set the configuration
         cr_val |= (mode << (shift + 2)); // Set the mode
         cr_reg.write_volatile(cr_val);
     }
 }
-
 
 const GPIOA_BASE: u32 = 0x4001_0800;
 const GPIOB_BASE: u32 = 0x4001_0C00;
@@ -87,10 +80,14 @@ pub unsafe fn read_button() -> u32 {
     GPIOC_IDR.read_volatile() & (1 << 13)
 }
 
-pub unsafe fn led_on() {
-    GPIOA_BSRR.write_volatile(1 << 5);
+pub fn led_on() {
+    unsafe {
+        GPIOA_BSRR.write_volatile(1 << 5);
+    }
 }
 
-pub unsafe fn led_off() {
-    GPIOA_BSRR.write_volatile(1 << (5 + 16));
+pub fn led_off() {
+    unsafe {
+        GPIOA_BSRR.write_volatile(1 << (5 + 16));
+    }
 }
