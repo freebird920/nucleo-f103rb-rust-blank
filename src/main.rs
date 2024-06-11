@@ -25,14 +25,15 @@ const RCC_BASE: u32 = 0x4002_1000;
 //     RCC_CR.write_volatile(rcc_cr_val);
 // }
 
-static mut tim2 : Option<tim_gp::TIM_GP> = None;
+static mut TIM2_INSTANCE : Option<tim_gp::TIM_GP> = None;
 
 #[entry]
 fn main() -> ! {
+    rtt_init_print!();
     let rcc = rcc::RCC::new(RCC_BASE);
+    let tim2 = tim_gp::TIM_GP::new(tim_gp::TIM_GP_TYPE::TIM2);
     let gpio_a = GPIO::new(GPIOx_BASE::A);
     let gpio_c = GPIO::new(GPIOx_BASE::C);
-    rtt_init_print!();
     unsafe {
         // Enable GPIOA, GPIOB and GPIOC clocks
         rcc.CR_HSION();
@@ -41,7 +42,7 @@ fn main() -> ! {
         rprintln!("CR: {}", cr_val);
         let cfgr_val =     rcc.read_cfgr();
         rprintln!("CFGR: {}", cfgr_val);
-
+        rcc.APB1ENR_TIMxEN(rcc::TIMxEN::TIM2EN, true);
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPAEN, true);
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPCEN, true);
 
@@ -61,13 +62,6 @@ fn main() -> ! {
                 peripherals::gpio::led_off();
             } else {
                 peripherals::gpio::led_on();
-                utils::delay::delay_ms(1000);
-                // tim2.delay_ms(1000);
-                rprintln!("LED ON");
-                peripherals::gpio::led_off();
-                utils::delay::delay_ms(1000);
-
-                // tim2.delay_ms(1000);
             }
 
         }

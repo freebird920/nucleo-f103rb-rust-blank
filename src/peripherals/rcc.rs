@@ -3,7 +3,15 @@ use crate::peripherals::flash::{FLASH, FLASH_LATENCY};
 pub struct RCC {
     base: u32,
 }
+pub enum TIMxEN {
+    TIM2EN = 0,
+    TIM3EN = 1,
+    TIM4EN = 2,
+    TIM5EN = 3,
+    TIM6EN = 4,
+    TIM7EN = 5,
 
+}
 pub enum IOPxEN {
     IOPAEN = 2,
     IOPBEN = 3,
@@ -117,7 +125,19 @@ impl RCC {
         fn APB1ENR(&self) -> *mut u32 {
         (self.base + 0x1C) as *mut u32
     }
-
+    pub fn APB1ENR_TIMxEN(&self, tim_x_en: TIMxEN, enable: bool) {
+        unsafe {
+            let apb1enr = self.APB1ENR();
+            let mut apb1enr_val = apb1enr.read_volatile();
+            let bit = tim_x_en as u32;
+            if enable {
+                apb1enr_val |= (1 << bit); // Enable TIMx
+            } else {
+                apb1enr_val &= !(1 << bit); // Disable TIMx
+            }
+            apb1enr.write_volatile(apb1enr_val);
+        }
+    }
     pub fn APB1ENR_TIM2EN(&self, enable: bool) {
         unsafe {
             let apb1enr = self.APB1ENR();

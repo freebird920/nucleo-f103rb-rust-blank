@@ -35,6 +35,7 @@ impl TIM_GP {
             self.PSC().write_volatile(psc_value);
         }
     }
+    
 
 }
 
