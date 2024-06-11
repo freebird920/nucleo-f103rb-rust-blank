@@ -1,11 +1,10 @@
 #![no_std]
 #![no_main]
 #![allow(unused_parens)]
-use cortex_m::asm::nop;
 use cortex_m_rt::entry;
 use panic_halt as _;
 use peripherals::{
-    gpio::{led_off, led_on, GPIOx_BASE, GPIO},
+    gpio::{GPIOx_BASE, GPIO},
     tim_gp,
 };
 use rtt_target::{rprintln, rtt_init_print};
@@ -39,18 +38,18 @@ fn main() -> ! {
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPAEN, true);
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPCEN, true);
 
-        gpio_a.port_config(5, 0b00, 0b11);
-        gpio_c.port_config(13, 0b01, 0b00); // PC13 is input mode
-        peripherals::gpio::init();
+        gpio_a.crl_port_config(5, 0b0001); // Configure GPIOA pin 5 as output push-pull
+        // gpio_c.port_config(13, 0b01, 0b00); // PC13 is input mode
+        // gpio::init();
         rprintln!("GPIO initialized")
     }
     loop {
         // rprintln!("Echo ... ");
-        led_on();
-        delay_sys_clk_ms(1000);
         rprintln!("Echo ... on ");
-        led_off();
+        gpio_a.bsrr_write(5);
         delay_sys_clk_ms(1000);
         rprintln!("Echo ... off");
+        gpio_a.bsrr_reset(5);
+        delay_sys_clk_ms(1000);
     }
 }
