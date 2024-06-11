@@ -40,6 +40,9 @@ impl GPIO {
             self.BSRR().write_volatile(1 << (port + 16));
         }
     }
+    pub fn idr_read(&self, port: u8) -> u32 {
+        unsafe { (self.IDR().read_volatile() & (1 << port)) >> port }
+    }
     pub fn crl_port_config(&self, port: u8, cnf_mode: u32) {
         assert!(port < 8, "Port number must be between 0 and 7");
         unsafe {
@@ -50,15 +53,19 @@ impl GPIO {
             self.CRL().write_volatile(crl_val);
         }
     }
-    pub fn crh_port_config(&self, port: u8, cnf_mode: u32) {
-        assert!(port < 8, "Port number must be between 8 and 15");
-        let shift = (port - 8) * 4;
+    pub fn crh_port_config(&self, port: u8, mode: u32) {
+        assert!(
+            port >= 8 && port < 16,
+            "Port number must be between 8 and 15 for CRH"
+        );
         unsafe {
-            let mut crh_val = self.CRH().read_volatile();
-            crh_val &= !(0b1111 << shift); // Clear the current configuration
-            crh_val |= (cnf_mode << shift); // Set the configuration
-            self.CRH().write_volatile(crh_val);
+            let shift = (port - 8) * 4;
+            let crh_reg = self.CRH();
+
+            let mut cr_val = crh_reg.read_volatile();
+            cr_val &= !(0b1111 << shift); // Clear the current configuration
+            cr_val |= (mode << shift); // Set the mode
+            crh_reg.write_volatile(cr_val);
         }
     }
-
 }

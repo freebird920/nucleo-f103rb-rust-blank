@@ -39,17 +39,20 @@ fn main() -> ! {
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPCEN, true);
 
         gpio_a.crl_port_config(5, 0b0001); // Configure GPIOA pin 5 as output push-pull
-        // gpio_c.port_config(13, 0b01, 0b00); // PC13 is input mode
-        // gpio::init();
+        gpio_c.crh_port_config(13, 0b0100); // PC13 is input mode
         rprintln!("GPIO initialized")
     }
     loop {
-        // rprintln!("Echo ... ");
-        rprintln!("Echo ... on ");
-        gpio_a.bsrr_write(5);
-        delay_sys_clk_ms(1000);
-        rprintln!("Echo ... off");
-        gpio_a.bsrr_reset(5);
-        delay_sys_clk_ms(1000);
+        if gpio_c.idr_read(13) == 0 {
+            rprintln!("Button pressed");
+            delay_sys_clk_ms(1000);
+        } else {
+            rprintln!("Echo ... on");
+            gpio_a.bsrr_write(5);
+            delay_sys_clk_ms(1000);
+            rprintln!("Echo ... off");
+            gpio_a.bsrr_reset(5);
+            delay_sys_clk_ms(1000);
+        }
     }
 }
