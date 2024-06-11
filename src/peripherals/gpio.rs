@@ -1,3 +1,5 @@
+
+use volatile_register::{RO, RW};
 pub enum GPIOx_BASE {
     A = 0x4001_0800,
     B = 0x4001_0C00,

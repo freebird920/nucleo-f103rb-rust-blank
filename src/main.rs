@@ -2,6 +2,7 @@
 #![no_main]
 #![allow(unused_parens)]
 // #![deny(unsafe_code)]
+use cortex_m;
 use cortex_m_rt::entry;
 use panic_halt as _;
 use peripherals::{gpio::{GPIOx_BASE, GPIO}, tim_gp};
@@ -32,6 +33,7 @@ fn main() -> ! {
     rtt_init_print!();
     let rcc = rcc::RCC::new(RCC_BASE);
     let tim2 = tim_gp::TIM_GP::new(tim_gp::TIM_GP_TYPE::TIM2);
+    tim2.set_psc(32_000);
     let gpio_a = GPIO::new(GPIOx_BASE::A);
     let gpio_c = GPIO::new(GPIOx_BASE::C);
     unsafe {
@@ -65,6 +67,6 @@ fn main() -> ! {
             }
 
         }
-        rprintln!("Loop count: {}", count);
+        // rprintln!("Loop count: {}", count);
     }
 }
