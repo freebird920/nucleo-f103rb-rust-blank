@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 pub enum GPIOx_BASE {
     A = 0x4001_0800,
     B = 0x4001_0C00,

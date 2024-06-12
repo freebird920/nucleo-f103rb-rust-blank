@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![allow(unused_parens)]
+
 use cortex_m_rt::entry;
 use panic_halt as _;
 use peripherals::{
@@ -19,6 +20,7 @@ const PCF8574_ADDRESS: u8 = 0b100111;
 const RCC_BASE: u32 = 0x4002_1000;
 const EXTI_BASE: u32 = 0x4001_0400;
 const AFIO_BASE: u32 = 0x4001_0000;
+
 #[entry]
 fn main() -> ! {
     rtt_init_print!();
@@ -27,6 +29,8 @@ fn main() -> ! {
     let gpio_b = GPIO::new(GPIOx_BASE::B);
     let gpio_c = GPIO::new(GPIOx_BASE::C);
     let afio = AFIO::new(AFIO_BASE);
+    let exti = EXTI::new(EXTI_BASE);
+
     unsafe {
         // Enable GPIOA, GPIOB and GPIOC clocks
         rcc.CR_HSION();
@@ -44,18 +48,22 @@ fn main() -> ! {
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPBEN, true);
         rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPCEN, true);
         
-
         rcc.ABP2ENR_AFIOEN(true);
 
         gpio_a.crl_port_config(5, 0b0001); // Configure GPIOA pin 5 as output push-pull
-                                           // gpio PB10 scl and PB11 sda
         gpio_b.crh_port_config(10, 0b1001); // Configure GPIOC pin 10 as output open-drain
         gpio_b.crh_port_config(11, 0b1010); // Configure GPIOC pin 11 as output open-drain
 
         gpio_c.crh_port_config(13, 0b0100); // PC13 is input mode
         rprintln!("GPIO initialized");
 
-        afio.exti_cr(EXTIx_Px::PC, 13);
+
+        // interrupt configuration
+
+        afio.exti_cr_x(EXTIx_Px::PC, 13); // Configure EXTI13 to use PC13
+        exti.ftsr_set(13, true); // Enable rising edge trigger on EXTI13
+
+
 
         let i2c2 = I2C::new(I2C_BASE::BASE_I2C2);
         i2c2.init();

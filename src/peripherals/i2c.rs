@@ -1,4 +1,4 @@
-use cortex_m::delay;
+#![allow(non_snake_case)]
 use rtt_target::rprintln;
 
 use crate::utils::delay::{delay_sys_clk_ms, delay_sys_clk_10us};

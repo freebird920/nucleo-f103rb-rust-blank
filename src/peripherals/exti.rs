@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 pub struct EXTI {
     base: u32,
 }
@@ -27,6 +28,18 @@ impl EXTI {
         (self.base + 0x14) as *mut u32
     }
     pub fn rstr_set(&self, TRx: u8, val: bool) {
+        unsafe {
+            let rtsr = self.RTSR();
+            let mut rtsr_val = rtsr.read_volatile();
+            if val {
+                rtsr_val |= 1 << TRx;
+            } else {
+                rtsr_val &= !(1 << TRx);
+            }
+            rtsr.write_volatile(rtsr_val);
+        }
+    }
+    pub fn rtsr_set(&self, TRx: u8, val: bool) {
         unsafe {
             let rtsr = self.RTSR();
             let mut rtsr_val = rtsr.read_volatile();

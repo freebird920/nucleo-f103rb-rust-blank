@@ -1,4 +1,5 @@
-use rtt_target::rprintln;
+#![allow(non_snake_case)]
+
 
 pub struct AFIO {
     base: u32,
@@ -42,7 +43,9 @@ impl AFIO {
     fn MAPR2(&self) -> *mut u32 {
         (self.base + 0x1C) as *mut u32
     }
-    pub fn exti_cr(&self, port: EXTIx_Px, pin: u8) {
+    /// Configure the external interrupt line
+    /// EXTIx external interrupt 
+    pub fn exti_cr_x(&self, port: EXTIx_Px, pin: u8) {
         unsafe {
             let exticr = match pin {
                 0..=3 => self.EXTICR1(),
