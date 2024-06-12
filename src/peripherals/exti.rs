@@ -27,6 +27,18 @@ impl EXTI {
     fn PR(&self) -> *mut u32 {
         (self.base + 0x14) as *mut u32
     }
+    pub fn imr_set(&self, MRx: u8, enable: bool) {
+        unsafe {
+            let imr = self.IMR();
+            let mut imr_val = imr.read_volatile();
+            if enable {
+                imr_val |= 1 << MRx;
+            } else {
+                imr_val &= !(1 << MRx);
+            }
+            imr.write_volatile(imr_val);
+        }
+    }
     pub fn rstr_set(&self, TRx: u8, val: bool) {
         unsafe {
             let rtsr = self.RTSR();
@@ -52,6 +64,7 @@ impl EXTI {
         }
     }
 
+
     pub fn ftsr_set(&self, TRx: u8, val: bool) {
         unsafe {
             let ftsr = self.FTSR();
@@ -64,4 +77,13 @@ impl EXTI {
             ftsr.write_volatile(ftsr_val);
         }
     }
+
+    pub fn pr_read(&self, PRx: u8) -> bool {
+        unsafe {
+            let pr = self.PR();
+            let pr_val = pr.read_volatile();
+            pr_val & (1 << PRx) != 0
+        }
+    }
+
 }

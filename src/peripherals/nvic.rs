@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
-struct NVIC {
-    base: u32,
-}
-const NVIC_BASE: u32 = 0xE000_E100;
+
+use rtt_target::rprintln;
+
+pub const NVIC_BASE: u32 = 0xE000_E100;
 
 const NVIC_ISER: [*mut u32; 3] = [
     (NVIC_BASE + 0x000) as *mut u32, // ISER[0]
@@ -33,8 +33,15 @@ const OFFSET_NVIC_IABRx: [*mut u32; 3] = [
     (NVIC_BASE + 0x204) as *mut u32, // IABR[1]
     (NVIC_BASE + 0x208) as *mut u32, // IABR[2]
 ];
-
+pub struct NVIC {
+    base: u32,
+}
 impl NVIC {
+    pub fn new(base: u32) -> NVIC {
+        NVIC {
+            base: base,
+        }
+    }
     pub fn interrupt_group(&self, position: u8) -> Result<u8, &'static str> {
         match position {
             0..=31 => Ok(0),  // ISER[0], ICER[0], ISPR[0], ICPR[0], IABR[0]
@@ -44,10 +51,17 @@ impl NVIC {
         }
     }
 
-    pub fn ISER(&self, position: u8) -> Result<*mut u32, &'static str> {
-        let group = self.interrupt_group(position).unwrap();
+    fn ISER(&self, position: u8) -> Result<*mut u32, &'static str> {
+        let group = self.interrupt_group(position)?;
         Ok(NVIC_ISER[group as usize] as *mut u32)
     }
-
-
+    pub fn enable_interrupt(&self, position: u8) {
+        let reg_iser = self.ISER(position).unwrap();
+        unsafe {
+            let mut reg_iser_val = reg_iser.read_volatile();
+            reg_iser_val |= 1 << (position % 32);
+            reg_iser.write_volatile(reg_iser_val);
+        }
+        rprintln!("Interrupt enabled. Position is {}", position);
+    }
 }

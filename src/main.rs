@@ -2,10 +2,10 @@
 #![no_main]
 #![allow(unused_parens)]
 
-use cortex_m_rt::entry;
+use cortex_m_rt::{entry, exception};
 use panic_halt as _;
 use peripherals::{
-    afio::{EXTIx_Px, AFIO}, exti::EXTI, gpio::{GPIOx_BASE, GPIO}, i2c::{I2C, I2C_BASE, PCF8574_LCD}, tim_gp
+    afio::{EXTIx_Px, AFIO}, exti::EXTI, gpio::{GPIOx_BASE, GPIO}, i2c::{I2C, I2C_BASE, PCF8574_LCD}, nvic::{NVIC, NVIC_BASE}, tim_gp
 };
 use rtt_target::{rprintln, rtt_init_print};
 use utils::delay::{delay_sys_clk_ms};
@@ -30,7 +30,7 @@ fn main() -> ! {
     let gpio_c = GPIO::new(GPIOx_BASE::C);
     let afio = AFIO::new(AFIO_BASE);
     let exti = EXTI::new(EXTI_BASE);
-
+    let nvic = NVIC::new(NVIC_BASE);
     unsafe {
         // Enable GPIOA, GPIOB and GPIOC clocks
         rcc.CR_HSION();
@@ -61,8 +61,10 @@ fn main() -> ! {
         // interrupt configuration
 
         afio.exti_cr_x(EXTIx_Px::PC, 13); // Configure EXTI13 to use PC13
+        exti.imr_set(13, true); // Enable interrupt mask register for EXTI13
         exti.ftsr_set(13, true); // Enable rising edge trigger on EXTI13
-
+        // exti.rstr_set(13, true); 
+        nvic.enable_interrupt(40); // Enable EXTI15_10 interrupt
 
 
         let i2c2 = I2C::new(I2C_BASE::BASE_I2C2);
@@ -75,14 +77,6 @@ fn main() -> ! {
 
         // lcd.print("Hell");
         loop {
-            if gpio_c.idr_read(13) == 0 {
-                rprintln!("Button pressed");
-                gpio_a.bsrr_write(5);
-                lcd.display_off();
-                delay_sys_clk_ms(10);
-                lcd.lcd_initialize();
-                delay_sys_clk_ms(1000);
-                } else {
                 lcd.clear();
                 delay_sys_clk_ms(1000);
                 lcd.set_cursor(0, 0);
@@ -93,12 +87,11 @@ fn main() -> ! {
                 delay_sys_clk_ms(10);
                 lcd.print("lo korea");
                 delay_sys_clk_ms(1000);
-                // rprintln!("Echo ... on");
-                // gpio_a.bsrr_write(5);
-                // rprintln!("Echo ... off");
-                // gpio_a.bsrr_reset(5);
-                // delay_sys_clk_ms(1000);
-            }
         }
     }
+}
+
+#[exception]
+unsafe fn DefaultHandler(irqn: i16) {
+    rprintln!("Unhandled exception (IRQn = {})", irqn);
 }
