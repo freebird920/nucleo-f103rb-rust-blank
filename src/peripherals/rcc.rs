@@ -116,6 +116,30 @@ impl RCC {
     fn APB1ENR(&self) -> *mut u32 {
         (self.base + 0x1C) as *mut u32
     }
+    pub fn APB1ENR_I2C1EN(&self, enable: bool) {
+        unsafe {
+            let apb1enr = self.APB1ENR();
+            let mut apb1enr_val = apb1enr.read_volatile();
+            if enable {
+                apb1enr_val |= (1 << 21); // Enable I2C1
+            } else {
+                apb1enr_val &= !(1 << 21); // Disable I2C1
+            }
+            apb1enr.write_volatile(apb1enr_val);
+        }
+    }
+    pub fn ABP1ENR_I2C2EN(&self, enable: bool) {
+        unsafe {
+            let apb1enr = self.APB1ENR();
+            let mut apb1enr_val = apb1enr.read_volatile();
+            if enable {
+                apb1enr_val |= (1 << 22); // Enable I2C2
+            } else {
+                apb1enr_val &= !(1 << 22); // Disable I2C2
+            }
+            apb1enr.write_volatile(apb1enr_val);
+        }
+    }
     pub fn APB1ENR_TIMxEN(&self, tim_x_en: TIMxEN, enable: bool) {
         unsafe {
             let apb1enr = self.APB1ENR();
