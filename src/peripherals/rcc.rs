@@ -99,7 +99,18 @@ impl RCC {
     fn APB2ENR(&self) -> *mut u32 {
         (self.base + 0x18) as *mut u32
     }
-
+    pub fn ABP2ENR_AFIOEN(&self, enable: bool) {
+        unsafe {
+            let apb2enr = self.APB2ENR();
+            let mut apb2enr_val = apb2enr.read_volatile();
+            if enable {
+                apb2enr_val |= (1 << 0); // Enable AFIO
+            } else {
+                apb2enr_val &= !(1 << 0); // Disable AFIO
+            }
+            apb2enr.write_volatile(apb2enr_val);
+        }
+    }
     pub fn APB2ENR_IOPx_EN(&self, iop_x_en: IOPxEN, enable: bool) {
         unsafe {
             let apb2enr = self.APB2ENR();
