@@ -302,6 +302,27 @@ impl PCF8574_LCD {
             self.send_data(c);
         }
     }
+    pub fn print_number(&self, number: u32) {
+        let mut num = number;
+        let mut buffer = [0u8; 10];
+        let mut i = 0;
+
+        if num == 0 {
+            self.send_data('0' as u8);
+            return;
+        }
+
+        while num > 0 {
+            buffer[i] = (num % 10) as u8 + '0' as u8;
+            num /= 10;
+            i += 1;
+        }
+
+        while i > 0 {
+            i -= 1;
+            self.send_data(buffer[i]);
+        }
+    }
     pub fn set_cursor(&self, row: u8, col: u8) {
         let mut address = match row {
             0 => 0x80 + col,

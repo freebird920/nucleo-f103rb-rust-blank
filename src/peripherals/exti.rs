@@ -77,12 +77,23 @@ impl EXTI {
             ftsr.write_volatile(ftsr_val);
         }
     }
-
+    /// EXTI_PR Pending register
     pub fn pr_read(&self, PRx: u8) -> bool {
         unsafe {
             let pr = self.PR();
             let pr_val = pr.read_volatile();
-            pr_val & (1 << PRx) != 0
+            return pr_val & (1 << PRx) != 0
+
+        }
+    }
+    
+    /// EXTI_PR Pending register
+    pub fn pr_clear(&self, PRx: u8) {
+        unsafe {
+            let pr = self.PR();
+            let mut pr_val = pr.read_volatile();
+            pr_val |= (1 << PRx);
+            pr.write_volatile(pr_val);
         }
     }
 
