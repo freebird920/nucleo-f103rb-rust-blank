@@ -6,3 +6,4 @@ pub mod tim_gp;
 pub mod exti;
 pub mod afio;
 pub mod nvic;
+pub mod adc;

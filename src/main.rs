@@ -13,7 +13,6 @@ use peripherals::{
     gpio::{GPIOx_BASE, GPIO},
     i2c::{I2C, I2C_BASE, PCF8574_LCD},
     nvic::{NVIC, NVIC_BASE},
-    tim_gp,
 };
 use rtt_target::{rprintln, rtt_init_print};
 use utils::delay::delay_sys_clk_ms;
@@ -41,7 +40,7 @@ fn main() -> ! {
     let afio = AFIO::new(AFIO_BASE);
     let exti = EXTI::new(EXTI_BASE);
     let nvic: NVIC = NVIC::new(NVIC_BASE);
-    unsafe {
+
         // Enable GPIOA, GPIOB and GPIOC clocks
         rcc.CR_HSION();
         // rcc.set_sys_clock_32MHz();
@@ -66,6 +65,12 @@ fn main() -> ! {
         gpio_b.crh_port_config(11, 0b1010); // Configure GPIOC pin 11 as output open-drain
 
         gpio_c.crh_port_config(13, 0b0100); // PC13 is input mode
+        gpio_c.crl_port_config(0, 0b0000); // PC0 is analog mode and input mode 
+        gpio_c.crl_port_config(1, 0b0000); // PC1 is analog mode and input mode
+
+
+        // PC0 ADC12_IN10  PC1 ADC12_IN11
+
         rprintln!("GPIO initialized");
 
         // interrupt configuration
@@ -123,7 +128,7 @@ fn main() -> ! {
             // delay_sys_clk_ms(100);
         }
     }
-}
+
 
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {

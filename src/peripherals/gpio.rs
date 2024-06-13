@@ -44,6 +44,26 @@ impl GPIO {
     pub fn idr_read(&self, port: u8) -> u32 {
         unsafe { (self.IDR().read_volatile() & (1 << port)) >> port }
     }
+
+    /// CNFy[1:0]: Port configuration bits (y = 0..7)
+    /// 
+    /// 00: Analog mode
+    /// 
+    /// 01: Floating input (reset state)
+    /// 
+    /// 10: Input with pull-up / pull-down
+    /// 
+    /// 11: General purpose output push-pull
+    ///
+    /// MODEx[1:0] 
+    ///
+    /// 00: Input mode (reset state)
+    ///
+    /// 01: Output mode, max speed 10 MHz.
+    ///
+    /// 10: Output mode, max speed 2 MHz.
+    ///
+    /// 11: Output mode, max speed 50 MHz.
     pub fn crl_port_config(&self, port: u8, cnf_mode: u32) {
         assert!(port < 8, "Port number must be between 0 and 7");
         unsafe {

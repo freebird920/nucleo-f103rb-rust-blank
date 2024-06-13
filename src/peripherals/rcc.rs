@@ -79,7 +79,6 @@ impl RCC {
             let mut rcc_cfgr_val = rcc_cfgr.read_volatile();
 
             // rcc_cfgr_val &= !(0b1 << 24); // Clear PLLON bit 
-
             rcc_cfgr_val &= !(1 << 16); // Clear PLLSRC bit (select HSI/2)
             rcc_cfgr_val &= !(0b1111 << 18); // Clear PLLMUL bits
             rcc_cfgr_val |= (0b0110 << 18); // Set PLLMUL to 8 (4 MHz * 8 = 32 MHz)
