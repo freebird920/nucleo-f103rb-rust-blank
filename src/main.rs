@@ -44,7 +44,8 @@ fn main() -> ! {
     unsafe {
         // Enable GPIOA, GPIOB and GPIOC clocks
         rcc.CR_HSION();
-        rcc.set_sys_clock_32MHz();
+        // rcc.set_sys_clock_32MHz();
+        rcc.set_sys_clock_64MHz();
         let cr_val = rcc.read_cr();
         rprintln!("CR: {}", cr_val);
         let cfgr_val = rcc.read_cfgr();
@@ -82,21 +83,33 @@ fn main() -> ! {
         lcd.lcd_initialize();
         rprintln!("LCD initialized");
 
+        let pllrdy = rcc.read_cr_pllrdy();
+        rprintln!("PLL ready: {}", pllrdy);
+        let mut loop_count = 0;
         // lcd.print("Hell");
         loop {
             let count = COUNT.load(Ordering::Relaxed).into();
             if REFRESH_LCD.load(Ordering::Relaxed) {
                 REFRESH_LCD.store(false, Ordering::Relaxed);
+                lcd.set_cursor(0, 0);
                 lcd.clear();
                 delay_sys_clk_ms(100);
                 lcd.set_cursor(0, 0);
                 delay_sys_clk_ms(100);
-                lcd.print("Hello kor");
+                lcd.print("Hello");
+                lcd.set_cursor(0, 6);
+                lcd.print_number(loop_count);
                 delay_sys_clk_ms(100);
                 lcd.set_cursor(1, 2);
                 delay_sys_clk_ms(100);
                 lcd.print_number(count);
                 delay_sys_clk_ms(100);
+            } else {
+                loop_count += 1;
+                lcd.set_cursor(0, 6);
+                lcd.print_number(loop_count);
+                delay_sys_clk_ms(1000);
+                // REFRESH_LCD.store(true, Ordering::Relaxed);
             }
             // lcd.clear();
             // delay_sys_clk_ms(100);

@@ -79,6 +79,8 @@ impl I2C {
         self.ccr_set(40); // Set CCR[11:0] to 40 (Standard mode, 100 kHz)
         self.trise_set(9); // Set TRISE[5:0] to 9
         self.cr1_pe(true); // Enable I2C
+
+        delay_sys_clk_ms(50);
     }
     pub fn cr1_start(&self) {
         unsafe {

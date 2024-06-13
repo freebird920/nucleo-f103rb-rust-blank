@@ -1,4 +1,4 @@
-use crate::peripherals::flash::{FLASH, FLASH_LATENCY};
+use crate::{peripherals::flash::{FLASH, FLASH_LATENCY}, utils::delay::delay_sys_clk_ms};
 
 pub struct RCC {
     base: u32,
@@ -42,6 +42,13 @@ impl RCC {
             while rcc_cr.read_volatile() & (1 << 1) == 0 {} // Wait until HSI is ready
         }
     }
+    pub fn read_cr_pllrdy(&self) -> bool {
+        unsafe {
+            let rcc_cr = self.CR();
+            let rcc_cr_val = rcc_cr.read_volatile();
+            rcc_cr_val & (1 << 25) != 0
+        }
+    }
     pub fn read_cfgr(&self) -> u32 {
         unsafe {
             let rcc_cfgr = self.CFGR();
@@ -63,11 +70,20 @@ impl RCC {
             rcc_cr.write_volatile(rcc_cr_val);
             while (rcc_cr.read_volatile() & (1 << 1)) == 0 {} // Wait until HSIRDY
 
+
+            let flash = FLASH::new(0x4002_2000);
+            flash.ACR_LATENCY(FLASH_LATENCY::_1WS); // Set flash latency
+            flash.ACR_PRFTBE(true); // Enable prefetch buffer
+
             let rcc_cfgr = self.CFGR();
             let mut rcc_cfgr_val = rcc_cfgr.read_volatile();
+
+            // rcc_cfgr_val &= !(0b1 << 24); // Clear PLLON bit 
+
             rcc_cfgr_val &= !(1 << 16); // Clear PLLSRC bit (select HSI/2)
             rcc_cfgr_val &= !(0b1111 << 18); // Clear PLLMUL bits
             rcc_cfgr_val |= (0b0110 << 18); // Set PLLMUL to 8 (4 MHz * 8 = 32 MHz)
+            // rcc_cfgr_val |= (0b1110 << 18); // Set PLLMUL to 8 (4 MHz * 16 = 64 MHz)
             rcc_cfgr.write_volatile(rcc_cfgr_val);
 
             rcc_cfgr_val = rcc_cfgr.read_volatile();
@@ -81,11 +97,48 @@ impl RCC {
             while (rcc_cr.read_volatile() & (1 << 25)) == 0 {} // Wait until PLLRDY
 
             while (rcc_cfgr.read_volatile() & (0b11 << 2)) != (0b10 << 2) {} // Wait until SWS is PLL
-            let flash = FLASH::new(0x4002_2000);
-            flash.ACR_LATENCY(FLASH_LATENCY::_1WS); // Set flash latency
-            flash.ACR_PRFTBE(true); // Enable prefetch buffer
+
+            delay_sys_clk_ms(100);
         }
     }
+    
+    pub fn set_sys_clock_64MHz(&self) {
+        unsafe {
+            let rcc_cr = self.CR();
+            let mut rcc_cr_val = rcc_cr.read_volatile();
+            rcc_cr_val |= (1 << 0); // HSION
+            rcc_cr.write_volatile(rcc_cr_val);
+            while (rcc_cr.read_volatile() & (1 << 1)) == 0 {} // Wait until HSIRDY
+    
+            let flash = FLASH::new(0x4002_2000);
+            flash.ACR_LATENCY(FLASH_LATENCY::_2WS); // Set flash latency for 64 MHz
+            flash.ACR_PRFTBE(true); // Enable prefetch buffer
+    
+            let rcc_cfgr = self.CFGR();
+            let mut rcc_cfgr_val = rcc_cfgr.read_volatile();
+    
+            // HSI/2를 PLL 소스로 선택하고 PLL 곱셈 인자를 16으로 설정
+            rcc_cfgr_val &= !(1 << 16); // Clear PLLSRC bit (select HSI/2)
+            rcc_cfgr_val &= !(0b1111 << 18); // Clear PLLMUL bits
+            rcc_cfgr_val |= (0b1110 << 18); // Set PLLMUL to 16 (8 MHz / 2 * 16 = 64 MHz)
+            rcc_cfgr.write_volatile(rcc_cfgr_val);
+    
+            rcc_cr_val = rcc_cr.read_volatile();
+            rcc_cr_val |= (1 << 24); // PLLON
+            rcc_cr.write_volatile(rcc_cr_val);
+            while (rcc_cr.read_volatile() & (1 << 25)) == 0 {} // Wait until PLLRDY
+    
+            rcc_cfgr_val = rcc_cfgr.read_volatile();
+            rcc_cfgr_val &= !(0b11 << 0); // Clear SW bits
+            rcc_cfgr_val |= (0b10 << 0); // Set SW to 0b10 (PLL selected as system clock)
+            rcc_cfgr.write_volatile(rcc_cfgr_val);
+    
+            while (rcc_cfgr.read_volatile() & (0b11 << 2)) != (0b10 << 2) {} // Wait until SWS is PLL
+    
+            delay_sys_clk_ms(100);
+        }
+    }
+    
     fn CR_PLLON(&self) {
         unsafe {
             let rcc_cr = self.CR();
