@@ -142,7 +142,24 @@ impl RCC {
             delay_sys_clk_ms(100);
         }
     }
-    
+
+    /// ## CFGR_ADCPRE - ADC prescaler
+    /// #### @param **adcpre** 
+    /// **IMPORTANT** PLCK2 / ADCPRE > 14MHz <br/>
+    /// - 00: PCLK2 divided by 2 <br/>
+    /// - 01: PCLK2 divided by 4 <br/>
+    /// - 10: PCLK2 divided by 6 <br/>
+    /// - 11: PCLK2 divided by 8 <br/>
+    pub fn cfgr_adcpre(&self , adcpre: u32) {
+        unsafe {
+            let mut rcc_cfgr_val = self.cfgr.read_volatile();
+            rcc_cfgr_val &= !(0b11 << 14); // Clear ADCPRE bits
+            rcc_cfgr_val |= (adcpre << 14); // Set ADCPRE bits
+            self.cfgr.write_volatile(rcc_cfgr_val);
+        }
+        
+    }
+
     fn cr_pllon(&self) {
         unsafe {
             let mut rcc_cr_val = self.cr.read_volatile();

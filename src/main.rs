@@ -40,95 +40,93 @@ fn main() -> ! {
     let exti = exti::new(EXTI_BASE);
     let nvic: NVIC = NVIC::new(NVIC_BASE);
 
-        // Enable GPIOA, GPIOB and GPIOC clocks
-        rcc.cr_hsion();
-        // rcc.set_sys_clock_32MHz();
-        rcc.set_sys_clock_64MHz();
-        
-        let cr_val = rcc.read_cr();
-        rprintln!("CR: {}", cr_val);
-        let cfgr_val = rcc.read_cfgr();
-        rprintln!("CFGR: {}", cfgr_val);
+    // Enable GPIOA, GPIOB and GPIOC clocks
+    rcc.cr_hsion();
+    // rcc.set_sys_clock_32MHz();
+    rcc.set_sys_clock_64MHz();
 
-        rcc.APB1ENR_TIMxEN(rcc::TIMxEN::TIM2EN, true);
+    let cr_val = rcc.read_cr();
+    rprintln!("CR: {}", cr_val);
+    let cfgr_val = rcc.read_cfgr();
+    rprintln!("CFGR: {}", cfgr_val);
 
-        rcc.ABP1ENR_I2C2EN(true);
+    rcc.cfgr_adcpre(11); // ADC prescaler 8
 
-        rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPAEN, true);
-        rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPBEN, true);
-        rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPCEN, true);
+    rcc.APB1ENR_TIMxEN(rcc::TIMxEN::TIM2EN, true);
+    rcc.ABP1ENR_I2C2EN(true);
+    rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPAEN, true);
+    rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPBEN, true);
+    rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPCEN, true);
 
-        rcc.ABP2ENR_AFIOEN(true);
+    rcc.ABP2ENR_AFIOEN(true);
 
-        gpio_a.crl_port_config(5, 0b0001); // Configure GPIOA pin 5 as output push-pull
-        gpio_b.crh_port_config(10, 0b1001); // Configure GPIOC pin 10 as output open-drain
-        gpio_b.crh_port_config(11, 0b1010); // Configure GPIOC pin 11 as output open-drain
+    gpio_a.crl_port_config(5, 0b0001); // Configure GPIOA pin 5 as output push-pull
+    gpio_b.crh_port_config(10, 0b1001); // Configure GPIOC pin 10 as output open-drain
+    gpio_b.crh_port_config(11, 0b1010); // Configure GPIOC pin 11 as output open-drain
 
-        gpio_c.crh_port_config(13, 0b0100); // PC13 is input mode
-        gpio_c.crl_port_config(0, 0b0000); // PC0 is analog mode and input mode 
-        gpio_c.crl_port_config(1, 0b0000); // PC1 is analog mode and input mode
+    gpio_c.crh_port_config(13, 0b0100); // PC13 is input mode
+    gpio_c.crl_port_config(0, 0b0000); // PC0 is analog mode and input mode
+    gpio_c.crl_port_config(1, 0b0000); // PC1 is analog mode and input mode
 
+    // PC0 ADC12_IN10  PC1 ADC12_IN11
 
-        // PC0 ADC12_IN10  PC1 ADC12_IN11
+    rprintln!("GPIO initialized");
 
-        rprintln!("GPIO initialized");
+    // interrupt configuration
 
-        // interrupt configuration
+    afio.exti_cr_x(EXTIx_Px::PC, 13); // Configure EXTI13 to use PC13
+    exti.imr_set(13, true); // Enable interrupt mask register for EXTI13
+    exti.ftsr_set(13, true); // Enable rising edge trigger on EXTI13
+                             // exti.rstr_set(13, true);
+    nvic.enable_interrupt(40); // Enable EXTI15_10 interrupt
 
-        afio.exti_cr_x(EXTIx_Px::PC, 13); // Configure EXTI13 to use PC13
-        exti.imr_set(13, true); // Enable interrupt mask register for EXTI13
-        exti.ftsr_set(13, true); // Enable rising edge trigger on EXTI13
-                                 // exti.rstr_set(13, true);
-        nvic.enable_interrupt(40); // Enable EXTI15_10 interrupt
+    let i2c2 = I2C::new(I2C_BASE::BASE_I2C2);
+    i2c2.init();
+    rprintln!("I2C2 initialized");
+    let lcd = PCF8574_LCD::new(i2c2, PCF8574_ADDRESS);
+    lcd.lcd_initialize();
+    rprintln!("LCD initialized");
 
-        let i2c2 = I2C::new(I2C_BASE::BASE_I2C2);
-        i2c2.init();
-        rprintln!("I2C2 initialized");
-        let lcd = PCF8574_LCD::new(i2c2, PCF8574_ADDRESS);
-        lcd.lcd_initialize();
-        rprintln!("LCD initialized");
-
-        let pllrdy = rcc.read_cr_pllrdy();
-        rprintln!("PLL ready: {}", pllrdy);
-        let mut loop_count = 0;
-        // lcd.print("Hell");
-        loop {
-            let count = COUNT.load(Ordering::Relaxed).into();
-            if REFRESH_LCD.load(Ordering::Relaxed) {
-                REFRESH_LCD.store(false, Ordering::Relaxed);
-                lcd.set_cursor(0, 0);
-                lcd.clear();
-                delay_sys_clk_ms(100);
-                lcd.set_cursor(0, 0);
-                delay_sys_clk_ms(100);
-                lcd.print("Hello");
-                lcd.set_cursor(0, 6);
-                lcd.print_number(loop_count);
-                delay_sys_clk_ms(100);
-                lcd.set_cursor(1, 2);
-                delay_sys_clk_ms(100);
-                lcd.print_number(count);
-                delay_sys_clk_ms(100);
-            } else {
-                loop_count += 1;
-                lcd.set_cursor(0, 6);
-                lcd.print_number(loop_count);
-                delay_sys_clk_ms(1000);
-                // REFRESH_LCD.store(true, Ordering::Relaxed);
-            }
-            // lcd.clear();
-            // delay_sys_clk_ms(100);
-            // lcd.set_cursor(0, 0);
-            // delay_sys_clk_ms(100);
-            // lcd.print("Hello kor");
-            // delay_sys_clk_ms(100);
-            // lcd.set_cursor(1, 2);
-            // delay_sys_clk_ms(100);
-            // lcd.print_number(count);
-            // delay_sys_clk_ms(100);
+    let pllrdy = rcc.read_cr_pllrdy();
+    rprintln!("PLL ready: {}", pllrdy);
+    let mut loop_count = 0;
+    // lcd.print("Hell");
+    loop {
+        let count = COUNT.load(Ordering::Relaxed).into();
+        if REFRESH_LCD.load(Ordering::Relaxed) {
+            REFRESH_LCD.store(false, Ordering::Relaxed);
+            lcd.set_cursor(0, 0);
+            lcd.clear();
+            delay_sys_clk_ms(100);
+            lcd.set_cursor(0, 0);
+            delay_sys_clk_ms(100);
+            lcd.print("Hello");
+            lcd.set_cursor(0, 6);
+            lcd.print_number(loop_count);
+            delay_sys_clk_ms(100);
+            lcd.set_cursor(1, 2);
+            delay_sys_clk_ms(100);
+            lcd.print_number(count);
+            delay_sys_clk_ms(100);
+        } else {
+            loop_count += 1;
+            lcd.set_cursor(0, 6);
+            lcd.print_number(loop_count);
+            delay_sys_clk_ms(1000);
+            // REFRESH_LCD.store(true, Ordering::Relaxed);
         }
+        // lcd.clear();
+        // delay_sys_clk_ms(100);
+        // lcd.set_cursor(0, 0);
+        // delay_sys_clk_ms(100);
+        // lcd.print("Hello kor");
+        // delay_sys_clk_ms(100);
+        // lcd.set_cursor(1, 2);
+        // delay_sys_clk_ms(100);
+        // lcd.print_number(count);
+        // delay_sys_clk_ms(100);
     }
-
+}
 
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {
