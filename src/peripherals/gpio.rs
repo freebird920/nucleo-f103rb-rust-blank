@@ -44,6 +44,8 @@ impl GPIO {
     pub fn idr_read(&self, port: u8) -> u32 {
         unsafe { (self.IDR().read_volatile() & (1 << port)) >> port }
     }
+
+    
     /// ## crl_port_config                                  
     /// cnf_mode: CNFy + MODEx                              <br/>
     /// #### CNFy: Port configuration bits (y = 0..7)       

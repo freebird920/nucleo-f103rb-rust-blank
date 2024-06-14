@@ -3,16 +3,11 @@
 #![allow(unused_parens)]
 
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-
-use crate::peripherals::rcc;
 use cortex_m_rt::{entry, exception};
+// use cortex_m::interrupt::{Mutex};
 use panic_halt as _;
 use peripherals::{
-    afio::{EXTIx_Px, AFIO},
-    exti::exti,
-    gpio::{GPIOx_BASE, GPIO},
-    i2c::{I2C, I2C_BASE, PCF8574_LCD},
-    nvic::{NVIC, NVIC_BASE},
+    adc::adc, afio::{EXTIx_Px, AFIO}, exti::exti, gpio::{GPIOx_BASE, GPIO}, i2c::{I2C, I2C_BASE, PCF8574_LCD}, nvic::{NVIC, NVIC_BASE}, rcc::{rcc, IOPxEN, TIMxEN}
 };
 use rtt_target::{rprintln, rtt_init_print};
 use utils::delay::delay_sys_clk_ms;
@@ -32,7 +27,7 @@ static REFRESH_LCD: AtomicBool = AtomicBool::new(true);
 #[entry]
 fn main() -> ! {
     rtt_init_print!();
-    let rcc = rcc::RCC::new();
+    let rcc = rcc::new();
     let gpio_a = GPIO::new(GPIOx_BASE::A);
     let gpio_b = GPIO::new(GPIOx_BASE::B);
     let gpio_c = GPIO::new(GPIOx_BASE::C);
@@ -52,11 +47,11 @@ fn main() -> ! {
 
     rcc.cfgr_adcpre(11); // ADC prescaler 8
 
-    rcc.APB1ENR_TIMxEN(rcc::TIMxEN::TIM2EN, true);
+    rcc.APB1ENR_TIMxEN(TIMxEN::TIM2EN, true);
     rcc.ABP1ENR_I2C2EN(true);
-    rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPAEN, true);
-    rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPBEN, true);
-    rcc.APB2ENR_IOPx_EN(rcc::IOPxEN::IOPCEN, true);
+    rcc.APB2ENR_IOPx_EN(IOPxEN::IOPAEN, true);
+    rcc.APB2ENR_IOPx_EN(IOPxEN::IOPBEN, true);
+    rcc.APB2ENR_IOPx_EN(IOPxEN::IOPCEN, true);
 
     rcc.ABP2ENR_AFIOEN(true);
 
@@ -68,6 +63,7 @@ fn main() -> ! {
     gpio_c.crl_port_config(0, 0b0000); // PC0 is analog mode and input mode
     gpio_c.crl_port_config(1, 0b0000); // PC1 is analog mode and input mode
 
+    adc::new(peripherals::adc::BASE_ADC::ADC_1);
     // PC0 ADC12_IN10  PC1 ADC12_IN11
 
     rprintln!("GPIO initialized");
@@ -115,16 +111,6 @@ fn main() -> ! {
             delay_sys_clk_ms(1000);
             // REFRESH_LCD.store(true, Ordering::Relaxed);
         }
-        // lcd.clear();
-        // delay_sys_clk_ms(100);
-        // lcd.set_cursor(0, 0);
-        // delay_sys_clk_ms(100);
-        // lcd.print("Hello kor");
-        // delay_sys_clk_ms(100);
-        // lcd.set_cursor(1, 2);
-        // delay_sys_clk_ms(100);
-        // lcd.print_number(count);
-        // delay_sys_clk_ms(100);
     }
 }
 

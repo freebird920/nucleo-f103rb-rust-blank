@@ -16,7 +16,7 @@ pub enum IOPxEN {
     IOPEEN = 6,
 }
 const RCC_BASE: u32 = 0x4002_1000;
-pub struct RCC {
+pub struct rcc {
     base: u32,
     cr: *mut u32,
     cfgr: *mut u32,
@@ -27,10 +27,10 @@ pub struct RCC {
     csr: *mut u32,
 }
 #[allow(non_snake_case)]
-impl RCC {
-    pub fn new() -> RCC{
+impl rcc {
+    pub fn new() -> rcc{
         let base_addr = RCC_BASE;
-        RCC {
+        rcc {
             base:       RCC_BASE,
             cr:         (RCC_BASE + 0x00) as *mut u32,
             cfgr:       (RCC_BASE + 0x04) as *mut u32,
