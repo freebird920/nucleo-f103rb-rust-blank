@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-pub struct EXTI {
+pub struct exti {
     base: u32,
     imr:    *mut u32,
     emr:    *mut u32,
@@ -10,9 +10,9 @@ pub struct EXTI {
 }
 
 
-impl EXTI {
-    pub fn new(base: u32) -> EXTI {
-        EXTI {
+impl exti {
+    pub fn new(base: u32) -> exti {
+        exti {
             base,
             imr:    (base + 0x00) as *mut u32,
             emr:    (base + 0x04) as *mut u32,
@@ -22,24 +22,7 @@ impl EXTI {
             pr:     (base + 0x14) as *mut u32,
         }
     }
-    fn IMR(&self) -> *mut u32 {
-        (self.base) as *mut u32
-    }
-    fn EMR(&self) -> *mut u32 {
-        (self.base + 0x04) as *mut u32
-    }
-    fn RTSR(&self) -> *mut u32 {
-        (self.base + 0x08) as *mut u32
-    }
-    fn FTSR(&self) -> *mut u32 {
-        (self.base + 0x0C) as *mut u32
-    }
-    fn SWIER(&self) -> *mut u32 {
-        (self.base + 0x10) as *mut u32
-    }
-    fn PR(&self) -> *mut u32 {
-        (self.base + 0x14) as *mut u32
-    }
+
     pub fn imr_set(&self, MRx: u8, enable: bool) {
         unsafe {
             let mut imr_val = self.imr.read_volatile();

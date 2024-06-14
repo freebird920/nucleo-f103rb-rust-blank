@@ -9,7 +9,7 @@ use cortex_m_rt::{entry, exception};
 use panic_halt as _;
 use peripherals::{
     afio::{EXTIx_Px, AFIO},
-    exti::EXTI,
+    exti::exti,
     gpio::{GPIOx_BASE, GPIO},
     i2c::{I2C, I2C_BASE, PCF8574_LCD},
     nvic::{NVIC, NVIC_BASE},
@@ -37,7 +37,7 @@ fn main() -> ! {
     let gpio_b = GPIO::new(GPIOx_BASE::B);
     let gpio_c = GPIO::new(GPIOx_BASE::C);
     let afio = AFIO::new(AFIO_BASE);
-    let exti = EXTI::new(EXTI_BASE);
+    let exti = exti::new(EXTI_BASE);
     let nvic: NVIC = NVIC::new(NVIC_BASE);
 
         // Enable GPIOA, GPIOB and GPIOC clocks
@@ -132,7 +132,7 @@ fn main() -> ! {
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {
     rprintln!("Unhandled exception (IRQn = {})", irqn);
-    let exti = EXTI::new(EXTI_BASE);
+    let exti = exti::new(EXTI_BASE);
     let pr_13 = exti.pr_read(13);
     if (irqn == 40) && pr_13 {
         rprintln!("EXTI13 interrupt");
