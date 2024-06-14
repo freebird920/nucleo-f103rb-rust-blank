@@ -22,7 +22,6 @@ mod utils;
 
 // const
 const PCF8574_ADDRESS: u8 = 0b100111;
-const RCC_BASE: u32 = 0x4002_1000;
 const EXTI_BASE: u32 = 0x4001_0400;
 const AFIO_BASE: u32 = 0x4001_0000;
 
@@ -33,7 +32,7 @@ static REFRESH_LCD: AtomicBool = AtomicBool::new(true);
 #[entry]
 fn main() -> ! {
     rtt_init_print!();
-    let rcc = rcc::RCC::new(RCC_BASE);
+    let rcc = rcc::RCC::new();
     let gpio_a = GPIO::new(GPIOx_BASE::A);
     let gpio_b = GPIO::new(GPIOx_BASE::B);
     let gpio_c = GPIO::new(GPIOx_BASE::C);
@@ -42,7 +41,7 @@ fn main() -> ! {
     let nvic: NVIC = NVIC::new(NVIC_BASE);
 
         // Enable GPIOA, GPIOB and GPIOC clocks
-        rcc.CR_HSION();
+        rcc.cr_hsion();
         // rcc.set_sys_clock_32MHz();
         rcc.set_sys_clock_64MHz();
         let cr_val = rcc.read_cr();
