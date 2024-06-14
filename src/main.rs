@@ -44,6 +44,7 @@ fn main() -> ! {
         rcc.cr_hsion();
         // rcc.set_sys_clock_32MHz();
         rcc.set_sys_clock_64MHz();
+        
         let cr_val = rcc.read_cr();
         rprintln!("CR: {}", cr_val);
         let cfgr_val = rcc.read_cfgr();

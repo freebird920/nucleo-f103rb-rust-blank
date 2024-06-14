@@ -21,6 +21,7 @@ impl ADC {
             cr1: (base_addr + 0x04) as *mut u32,
             cr2: (base_addr + 0x08) as *mut u32,
         }
+        
     }
 
 
