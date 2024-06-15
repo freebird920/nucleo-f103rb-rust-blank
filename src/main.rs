@@ -87,7 +87,7 @@ fn main() -> ! {
     };
     
     loop {
-        rprintln!("Hello, world!");
+        // rprintln!("Hello, world!");
         // delay(SYS_CLOCK.load(Ordering::Acquire));
     }
 }
