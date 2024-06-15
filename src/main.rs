@@ -3,32 +3,60 @@
 #![allow(unused_parens)]
 
 use core::sync::atomic::{AtomicU32, Ordering};
+use cortex_m_rt::{entry, exception};
 use cortex_m::asm::delay;
-use cortex_m_rt::entry;
 use panic_halt as _;
 
-use crate::peripherals::rcc::rcc;
+use cortex_m::interrupt::{self, Mutex};
+use cortex_m::peripheral::{SCB};
+use core::cell::RefCell;
+use crate::peripherals::rcc::Rcc;
+use crate::peripherals::stk::Stk;
+use crate::peripherals::tim_gp::TimGp;
+
+
 use rtt_target::{rprintln, rtt_init_print};
 
 mod peripherals;
 mod utils;
-
-// const
 // const PCF8574_ADDRESS: u8 = 0b100111;
-// const EXTI_BASE: u32 = 0x4001_0400;
-// const AFIO_BASE: u32 = 0x4001_0000;
-
-// static
 // static COUNT: AtomicU32 = AtomicU32::new(0);
 // static REFRESH_LCD: AtomicBool = AtomicBool::new(true);
 static SYS_CLOCK: AtomicU32 = AtomicU32::new(0);
+static PENDSV_MESSAGE: Mutex<RefCell<Option<&'static str>>> = Mutex::new(RefCell::new(None));
+
+// test_interrupt 함수 정의
+fn test_interrupt(num: u8) -> Result<(), &'static str> {
+    match num {
+        1 => Ok(()),
+        _ => {
+            trigger_error_interrupt("Error occurred in test_interrupt() function.");
+            Err("Invalid number")},
+    }
+}
+
+
+
+
 #[entry]
 fn main() -> ! {
     rtt_init_print!();
-    let rcc = rcc::new();
-    rcc.set_sys_clock(0b1110);
-    SYS_CLOCK.store(rcc.get_sys_clock(), Ordering::Release);
+    let rcc = Rcc::new();
+
+    rcc.set_sys_clock(0b1110); // 0b1110 -> 64Mhz
+    SYS_CLOCK.store(rcc.get_sys_clock(), Ordering::Release); // SysClock 저장
+    
+    let stk = Stk::new();
+    rprintln!("stk_calib noref{} skew{} tenms{}",stk.calib_noref_read(),stk.calib_skew_read(),stk.calib_tenms_read());
+
     rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire));
+
+    test_interrupt(4);
+    // TIM2 
+    let tim2 = TimGp::new(2);
+    tim2.tim_gp_clock_enable();
+
+
     loop {
         rprintln!("Hello, world!");
         delay(SYS_CLOCK.load(Ordering::Acquire));
@@ -37,79 +65,28 @@ fn main() -> ! {
 
 // #[exception]
 // unsafe fn DefaultHandler(irqn: i16) {
-//     rprintln!("Unhandled exception (IRQn = {})", irqn);
-//     let exti = exti::new(EXTI_BASE);
-//     let pr_13 = exti.pr_read(13);
-//     if (irqn == 40) && pr_13 {
-//         rprintln!("EXTI13 interrupt");
-//         COUNT.fetch_add(1, Ordering::Relaxed);
-//         REFRESH_LCD.store(true, Ordering::Relaxed);
-//         exti.pr_clear(13);
-//     }
+
+fn trigger_error_interrupt(message: &'static str) {
+    interrupt::free(|cs| {
+        *PENDSV_MESSAGE.borrow(cs).borrow_mut() = Some(message);
+    });
+    // PendSV 인터럽트를 트리거
+    unsafe {
+        (*SCB::PTR).icsr.write(1 << 28);
+    }
+}
+
+
+// #[exception]
+// unsafe fn DefaultHandler(irqn: i16) {
+//     trigger_error_interrupt("Error occurred in DefaultHandler() function.");
 // }
 
-// // fn get_sys_clock() -> u32 {
-//     // RCC 레지스터 하드코딩된 값
-//     let rcc = rcc::new();
-//     let rcc_cfgr = rcc.read_cfgr(); // 예시 값, 실제 값으로 교체 필요
-
-//     // HSI 클럭 속도
-//     let hsi_clk = 8_000_000; // 8 MHz
-//     // HSE 클럭 속도 (기본값)
-//     let hse_clk = 8_000_000; // 8 MHz
-
-//     // SWS 비트 확인 (시스템 클럭 소스)
-//     let sws = (rcc_cfgr >> 2) & 0b11;
-
-//     let sysclk = match sws {
-//         0b00 => {
-//             // HSI 사용
-//             hsi_clk
-//         }
-//         0b01 => {
-//             // HSE 사용
-//             hse_clk
-//         }
-//         0b10 => {
-//             // PLL 사용
-//             // PLL 소스 확인 (PLLSRC 비트)
-//             let pllsrc = (rcc_cfgr >> 16) & 0b1;
-//             let pll_clk_in = if pllsrc == 0 {
-//                 // HSI/2
-//                 hsi_clk / 2
-//             } else {
-//                 // HSE
-//                 if (rcc_cfgr >> 17) & 0b1 == 1 {
-//                     hse_clk / 2
-//                 } else {
-//                     hse_clk
-//                 }
-//             };
-
-//             // PLL 곱셈 계수 확인 (PLLMUL 비트)
-//             let pllmul = ((rcc_cfgr >> 18) & 0b1111) + 2;
-//             pll_clk_in * pllmul
-//         }
-//         _ => {
-//             // 예약된 값 (사용되지 않음)
-//             0
-//         }
-//     };
-
-//     // AHB 프리스케일러 확인 (HPRE 비트)
-//     let hpre = (rcc_cfgr >> 4) & 0b1111;
-//     let ahb_prescaler = match hpre {
-//         0b0000 => 1,
-//         0b1000 => 2,
-//         0b1001 => 4,
-//         0b1010 => 8,
-//         0b1011 => 16,
-//         0b1100 => 64,
-//         0b1101 => 128,
-//         0b1110 => 256,
-//         0b1111 => 512,
-//         _ => 1,
-//     };
-
-//     sysclk / ahb_prescaler
-// }
+#[exception]
+fn PendSV() {
+    interrupt::free(|cs| {
+        if let Some(message) = PENDSV_MESSAGE.borrow(cs).take() {
+            rprintln!("{}", message);
+        }
+    });
+}

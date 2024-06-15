@@ -1,14 +1,6 @@
 #![allow(non_snake_case)]
 use crate::peripherals::flash::Flash;
 
-pub enum TIMxEN {
-    TIM2EN = 0,
-    TIM3EN = 1,
-    TIM4EN = 2,
-    TIM5EN = 3,
-    TIM6EN = 4,
-    TIM7EN = 5,
-}
 pub enum IOPxEN {
     IOPAEN = 2,
     IOPBEN = 3,
@@ -17,7 +9,7 @@ pub enum IOPxEN {
     IOPEEN = 6,
 }
 const RCC_BASE: u32 = 0x4002_1000;
-pub struct rcc {
+pub struct Rcc {
     // base: u32,
     cr: *mut u32,
     cfgr: *mut u32,
@@ -28,10 +20,10 @@ pub struct rcc {
     // csr: *mut u32,
 }
 #[allow(non_snake_case)]
-impl rcc {
-    pub fn new() -> rcc {
+impl Rcc {
+    pub fn new() -> Rcc {
         // let base_addr = RCC_BASE;
-        rcc {
+        Rcc {
             // base: RCC_BASE,
             cr: (RCC_BASE + 0x00) as *mut u32,
             cfgr: (RCC_BASE + 0x04) as *mut u32,
@@ -68,8 +60,6 @@ impl rcc {
         unsafe { self.cr.read_volatile() }
     }
 
-
-
     /// ### set_sys_clock - Set system clock
     /// **IMPORTANT** PLL output freq muts not exceed 72MHz
     /// - 0b0000: PLL input clock x 2 = 8 MHz
@@ -89,19 +79,17 @@ impl rcc {
     /// - 0b1110: PLL input clock x 16 = 64 MHz
     /// - 0b1111: PLL input clock x 16 = 64 MHz
     pub fn set_sys_clock(&self, pllmul: u32) {
-
         // Check if multiplication factor is less than 16
         if (pllmul > 17) {
             panic!("Multiplication factor must be less than 16")
         };
         unsafe {
-
             // Ensure HSI
             self.cr_hsion();
 
             // set flash latency
             let flash = Flash::new();
-            let flash_latency:u8 = match pllmul {
+            let flash_latency: u8 = match pllmul {
                 0..=4 => 0b0000,
                 5..=10 => 0b0001,
                 11 => 0b0010,
@@ -109,7 +97,6 @@ impl rcc {
             };
             flash.acr_latency(flash_latency); // Set flash latency
             flash.acr_prftbe(true); // Enable prefetch buffer
-
 
             // rcc_cfgr_val &= !(0b1 << 24); // Clear PLLON bit
             self.pllmul_set(pllmul);
@@ -122,10 +109,8 @@ impl rcc {
 
             self.cr_pllon();
             // while (self.cfgr.read_volatile() & (0b11 << 2)) != (0b10 << 2) {} // Wait until SWS is PLL
-
         }
     }
-
 
     /// ### CFGR_PLLMUL - PLL multiplication factor
     /// **IMPORTANT** PLL output freq muts not exceed 72MHz
@@ -156,8 +141,6 @@ impl rcc {
             self.cfgr.write_volatile(rcc_cfgr_val);
         }
     }
-
-    
 
     /// ## CFGR_ADCPRE - ADC prescaler
     /// #### @param **adcpre**
@@ -218,7 +201,6 @@ impl rcc {
         }
     }
 
-
     /// ## APB2ENR_IOPx_EN - I/O port x clock enable
     /// #### @param **iop_x_en**
     /// - IOPAEN = 2
@@ -264,18 +246,25 @@ impl rcc {
             self.apb1enr.write_volatile(apb1enr_val);
         }
     }
-    pub fn APB1ENR_TIMxEN(&self, tim_x_en: TIMxEN, enable: bool) {
-        unsafe {
-            let mut apb1enr_val = self.apb1enr.read_volatile();
-            let bit = tim_x_en as u32;
-            if enable {
-                apb1enr_val |= (1 << bit); // Enable TIMx
-            } else {
-                apb1enr_val &= !(1 << bit); // Disable TIMx
+    pub fn apb1enr_tim_gp_en(&self, tim_gp_x: u8, enable: bool) -> Result<(), &str> {
+        match tim_gp_x {
+            2..=5 => {
+                unsafe {
+                    let mut apb1enr_val = self.apb1enr.read_volatile();
+                    let bit = (tim_gp_x as u32) - 2;
+                    if enable {
+                        apb1enr_val |= 1 << bit; // Enable TIMx
+                    } else {
+                        apb1enr_val &= !(1 << bit); // Disable TIMx
+                    }
+                    self.apb1enr.write_volatile(apb1enr_val);
+                }
+                Ok(())
             }
-            self.apb1enr.write_volatile(apb1enr_val);
+            _ => Err("Invalid general purpose timer"),
         }
     }
+
     pub fn APB1ENR_TIM2EN(&self, enable: bool) {
         unsafe {
             let mut apb1enr_val = self.apb1enr.read_volatile();
