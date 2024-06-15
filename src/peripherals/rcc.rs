@@ -1,4 +1,4 @@
-#![allow(non_snake_case)]
+// #![allow(non_snake_case)]
 use crate::peripherals::flash::Flash;
 
 pub enum IOPxEN {
