@@ -2,9 +2,9 @@
 #![no_main]
 #![allow(unused_parens)]
 
-use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m::asm::delay;
-use cortex_m_rt::{entry, exception};
+use cortex_m_rt::entry;
 use panic_halt as _;
 
 use crate::peripherals::rcc::rcc;
@@ -21,16 +21,17 @@ mod utils;
 // static
 // static COUNT: AtomicU32 = AtomicU32::new(0);
 // static REFRESH_LCD: AtomicBool = AtomicBool::new(true);
-static sys_clock: AtomicU32 = AtomicU32::new(0);
+static SYS_CLOCK: AtomicU32 = AtomicU32::new(0);
 #[entry]
 fn main() -> ! {
     rtt_init_print!();
     let rcc = rcc::new();
-    sys_clock.store(rcc.get_sys_clock(), Ordering::Release);
-    rprintln!("System clock: {} Hz", sys_clock.load(Ordering::Acquire));
+    rcc.set_sys_clock(0b1110);
+    SYS_CLOCK.store(rcc.get_sys_clock(), Ordering::Release);
+    rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire));
     loop {
         rprintln!("Hello, world!");
-        delay(sys_clock.load(Ordering::Acquire));
+        delay(SYS_CLOCK.load(Ordering::Acquire));
     }
 }
 

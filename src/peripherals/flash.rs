@@ -1,43 +1,45 @@
-pub struct FLASH {
-    base: u32,
+const FLASH_BASE: u32 = 0x4002_2000;
+
+pub struct Flash {
+    acr: *mut u32,
 }
 
-pub enum FLASH_LATENCY {
-    _0WS = 0b000,
-    _1WS = 0b001,
-    _2WS = 0b010,
-}
-
-impl FLASH {
-    pub fn new(base: u32) -> FLASH {
-        FLASH { base }
+impl Flash {
+    pub fn new() -> Flash {
+        Flash {
+            acr: (FLASH_BASE + 0x00) as *mut u32,
+        }
     }
 
-    fn ACR(&self) -> *mut u32 {
-        (self.base + 0x00) as *mut u32
-    }
 
-    pub fn ACR_PRFTBE(&self, enable: bool) {
+
+    pub fn acr_prftbe(&self, enable: bool) {
         unsafe {
-            let flash_acr = self.ACR();
-            let mut flash_acr_val = flash_acr.read_volatile();
+            let mut flash_acr_val = self.acr.read_volatile();
             if enable {
                 flash_acr_val |= (1 << 4); // Enable prefetch buffer
             } else {
                 flash_acr_val &= !(1 << 4); // Disable prefetch buffer
             }
-            flash_acr.write_volatile(flash_acr_val);
+            self.acr.write_volatile(flash_acr_val);
         }
     }
 
-    pub fn ACR_LATENCY(&self, flash_latency: FLASH_LATENCY) {
+    /// ## ACR_LATENCY
+    /// Set flash latency
+    /// - 0WS: 0b000 // System clock <= 24 MHz
+    /// - 1WS: 0b001 // 24 MHz < System clock <= 48 MHz
+    /// - 2WS: 0b010 // 48 MHz < System clock <= 72 MHz
+    pub fn acr_latency(&self, flash_latency: u8) {
+        if flash_latency > 2 {
+            panic!("Flash latency must be 0, 1, or 2");
+        }
         unsafe {
-            let flash_acr = self.ACR();
             let latency = flash_latency as u32;
-            let mut flash_acr_val = flash_acr.read_volatile();
+            let mut flash_acr_val = self.acr.read_volatile();
             flash_acr_val &= !(0b111 << 0);
             flash_acr_val |= (latency << 0);
-            flash_acr.write_volatile(flash_acr_val);
+            self.acr.write_volatile(flash_acr_val);
         }
     }
 }
