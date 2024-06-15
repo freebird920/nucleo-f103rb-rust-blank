@@ -169,8 +169,26 @@ impl rcc {
         }
     }
 
-    fn APB2ENR(&self) -> *mut u32 {
+    pub fn APB2ENR(&self) -> *mut u32 {
         (self.base + 0x18) as *mut u32
+    }
+    pub fn enable_adc1(&self) {
+        unsafe {
+            let mut apb2enr_val = self.apb2enr.read_volatile();
+            apb2enr_val |= (1 << 9);  // ADC1 클럭 활성화
+            self.apb2enr.write_volatile(apb2enr_val);
+        }
+    }
+    pub fn APB2ENR_ADC1EN(&self, enable: bool) {
+        unsafe {
+            let mut apb2enr_val = self.apb2enr.read_volatile();
+            if enable {
+                apb2enr_val |= (1 << 9); // Enable ADC1
+            } else {
+                apb2enr_val &= !(1 << 9); // Disable ADC1
+            }
+            self.apb2enr.write_volatile(apb2enr_val);
+        }
     }
     pub fn ABP2ENR_AFIOEN(&self, enable: bool) {
         unsafe {

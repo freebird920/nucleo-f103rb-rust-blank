@@ -1,17 +1,17 @@
 #![allow(non_snake_case)]
-pub enum GPIOx_BASE {
+pub enum GpioXBase {
     A = 0x4001_0800,
     B = 0x4001_0C00,
     C = 0x4001_1000,
 }
 
-pub struct GPIO {
+pub struct Gpio {
     base: u32,
 }
 
-impl GPIO {
-    pub fn new(base: GPIOx_BASE) -> Self {
-        GPIO { base: base as u32 }
+impl Gpio {
+    pub fn new(base: GpioXBase) -> Self {
+        Gpio { base: base as u32 }
     }
 
     unsafe fn CRL(&self) -> *mut u32 {
@@ -68,6 +68,9 @@ impl GPIO {
             self.CRL().write_volatile(crl_val);
         }
     }
+
+    
+
     pub fn crh_port_config(&self, port: u8, mode: u32) {
         assert!(
             port >= 8 && port < 16,
@@ -83,4 +86,14 @@ impl GPIO {
             crh_reg.write_volatile(cr_val);
         }
     }
+    pub fn configure_pc2_as_analog(&self) {
+        unsafe {
+            let gpio_c_crl = 0x4001_1000 as *mut u32; // GPIOC_CRL 레지스터 주소
+            let mut moder = gpio_c_crl.read_volatile();
+            moder &= !(0b11 << (2 * 4));  // CNF2[1:0] = 00 (아날로그 모드)
+            moder &= !(0b11 << ((2 * 4) + 2));  // MODE2[1:0] = 00 (입력 모드)
+            gpio_c_crl.write_volatile(moder);
+        }
+    }
+
 }
