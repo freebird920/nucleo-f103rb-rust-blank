@@ -1,10 +1,9 @@
+pub mod adc;
+pub mod afio;
+pub mod exti;
+pub mod flash;
 pub mod gpio;
 pub mod i2c;
 pub mod rcc;
-pub mod flash;
-pub mod tim_gp;
-pub mod exti;
-pub mod afio;
-pub mod nvic;
-pub mod adc;
 pub mod stk;
+pub mod tim_gp;

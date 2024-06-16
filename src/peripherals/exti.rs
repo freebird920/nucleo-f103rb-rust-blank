@@ -25,7 +25,13 @@ impl Exti {
     }
     
 
-    pub fn imr_set(&self, mr_x: u8, enable: bool) {
+    pub fn imr_set(&self, mr_x: u8, enable: bool)-> Result<(), &'static str>{
+        match mr_x {
+            0..=19  => (),
+            _       => Err("Invalid mr_x")?, 
+        }
+
+        
         unsafe {
             let mut imr_val = self.imr.read_volatile();
             if enable {
@@ -35,7 +41,10 @@ impl Exti {
             }
             self.imr.write_volatile(imr_val);
         }
+        Ok(())
     }
+
+
     pub fn rstr_set(&self, tr_x: u8, val: bool) {
         unsafe {
             let mut rtsr_val = self.rtsr.read_volatile();
@@ -47,23 +56,13 @@ impl Exti {
             self.rtsr.write_volatile(rtsr_val);
         }
     }
-    pub fn rtsr_set(&self, TRx: u8, val: bool) {
-        unsafe {
-            let mut rtsr_val = self.rtsr.read_volatile();
-            if val {
-                rtsr_val |= 1 << TRx;
-            } else {
-                rtsr_val &= !(1 << TRx);
-            }
-            self.rtsr.write_volatile(rtsr_val);
-        }
-    }
 
 
-    pub fn ftsr_set(&self, tr_x: u8, val: bool) {
+
+    pub fn ftsr_set(&self, tr_x: u8, enable: bool) {
         unsafe {
             let mut ftsr_val = self.ftsr.read_volatile();
-            if val {
+            if enable {
                 ftsr_val |= 1 << tr_x;
             } else {
                 ftsr_val &= !(1 << tr_x);
@@ -71,6 +70,8 @@ impl Exti {
             self.ftsr.write_volatile(ftsr_val);
         }
     }
+
+
     /// EXTI_PR Pending register
     pub fn pr_read(&self, pr_x: u8) -> bool {
         unsafe {
@@ -81,10 +82,10 @@ impl Exti {
     }
     
     /// EXTI_PR Pending register
-    pub fn pr_clear(&self, PRx: u8) {
+    pub fn pr_clear(&self, pr_x: u8) {
         unsafe {
             let mut pr_val = self.pr.read_volatile();
-            pr_val |= (1 << PRx);
+            pr_val |= (1 << pr_x);
             self.pr.write_volatile(pr_val);
         }
     }

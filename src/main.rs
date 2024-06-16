@@ -3,9 +3,10 @@
 #![allow(unused_parens)]
 
 use core::sync::atomic::{AtomicU32, Ordering};
+use core_peripherals::nvic::Nvic;
 use cortex_m_rt::{entry, exception};
 use panic_halt as _;
-use peripherals::{afio::Afio, gpio::Gpio};
+use peripherals::{afio::Afio, exti::Exti, gpio::Gpio};
 
 mod core_peripherals;
 mod peripherals;
@@ -95,6 +96,24 @@ fn main() -> ! {
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("AFIO Port 2 Pin 13 Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
+    // EXTI 세팅
+    let exti = Exti::new();
+    exti.ftsr_set(40, true);
+    // exti.pr_read(13);
+
+    // Nvic 세팅
+    let nvic = Nvic::new(40)
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Nvic Set")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+
+    nvic.as_ref()
+        .map(|nvic| {
+            nvic.iser_set(40, true);
+        })
+        .ok();
+
+
+
     loop {
         // rprintln!("Loop");
         gpio_a
@@ -104,6 +123,13 @@ fn main() -> ! {
             })
             .ok();
     }
+}
+#[exception]
+unsafe fn DefaultHandler(irqn: i16) {
+    rprintln!("Unhandled exception (IRQn = {})", irqn);
+    // Exti::new().pr_clear(13);
+
+
 }
 
 #[exception]
@@ -117,7 +143,4 @@ fn PendSV() {
     });
 }
 
-#[exception]
-unsafe fn DefaultHandler(irqn: i16) {
-    rprintln!("Unhandled exception (IRQn = {})", irqn);
-}
+
