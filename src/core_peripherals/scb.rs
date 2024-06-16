@@ -16,6 +16,7 @@ impl Scb {
             self.icsr.write_volatile(1 << 28);
         }
     }
+    #[allow(unused)]
     pub fn icsr_pendsvset_read(&self, ) -> u32 {
         unsafe {
             self.icsr.read_volatile()

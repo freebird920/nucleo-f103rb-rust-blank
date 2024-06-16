@@ -1,6 +1,7 @@
-// #![allow(non_snake_case)]
-use crate::peripherals::flash::Flash;
+#[allow(non_snake_case)]
 
+
+use crate::peripherals::flash::Flash;
 
 const RCC_BASE: u32 = 0x4002_1000;
 pub struct Rcc {
@@ -8,6 +9,7 @@ pub struct Rcc {
     cr: *mut u32,
     cfgr: *mut u32,
     apb2enr: *mut u32,
+    #[allow(unused)]
     apb1enr: *mut u32,
     // ahbenr: *mut u32,
     // bdcr: *mut u32,
@@ -28,9 +30,13 @@ impl Rcc {
             // csr: (RCC_BASE + 0x24) as *mut u32,
         }
     }
+
+    #[allow(unused)]
     pub fn apb2enr_read(&self) -> u32 {
         unsafe { self.apb2enr.read_volatile() }
     }
+
+
     /// ## CR_HSION -  HSI ON
     /// HSI oscillator enabled
     pub fn cr_hsion(&self) {
@@ -42,6 +48,7 @@ impl Rcc {
         }
     }
 
+    #[allow(unused)]
     pub fn read_cr_pllrdy(&self) -> bool {
         unsafe {
             let rcc_cr_val = self.cr.read_volatile();
@@ -52,6 +59,8 @@ impl Rcc {
     pub fn read_cfgr(&self) -> u32 {
         unsafe { self.cfgr.read_volatile() }
     }
+
+    #[allow(unused)]
     pub fn read_cr(&self) -> u32 {
         unsafe { self.cr.read_volatile() }
     }
@@ -138,6 +147,8 @@ impl Rcc {
         }
     }
 
+
+    #[allow(unused)]
     /// ## CFGR_ADCPRE - ADC prescaler
     /// #### @param **adcpre**
     /// **IMPORTANT** PLCK2 / ADCPRE > 14MHz <br/>
@@ -167,6 +178,8 @@ impl Rcc {
     // pub fn APB2ENR(&self) -> *mut u32 {
     //     (self.base + 0x18) as *mut u32
     // }
+
+    #[allow(unused)]
     pub fn enable_adc1(&self) {
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();
@@ -174,6 +187,7 @@ impl Rcc {
             self.apb2enr.write_volatile(apb2enr_val);
         }
     }
+
     pub fn APB2ENR_ADC1EN(&self, enable: bool) {
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();

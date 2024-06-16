@@ -14,6 +14,8 @@ mod utils;
 use crate::core_peripherals::scb::Scb;
 use crate::peripherals::rcc::Rcc;
 use crate::peripherals::stk::Stk;
+
+#[allow(unused)]
 use crate::peripherals::tim_gp::TimGp;
 use core::cell::RefCell;
 
