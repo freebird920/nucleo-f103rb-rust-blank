@@ -1,13 +1,7 @@
 // #![allow(non_snake_case)]
 use crate::peripherals::flash::Flash;
 
-pub enum IOPxEN {
-    IOPAEN = 2,
-    IOPBEN = 3,
-    IOPCEN = 4,
-    IOPDEN = 5,
-    IOPEEN = 6,
-}
+
 const RCC_BASE: u32 = 0x4002_1000;
 pub struct Rcc {
     // base: u32,
@@ -34,7 +28,9 @@ impl Rcc {
             // csr: (RCC_BASE + 0x24) as *mut u32,
         }
     }
-
+    pub fn apb2enr_read(&self) -> u32 {
+        unsafe { self.apb2enr.read_volatile() }
+    }
     /// ## CR_HSION -  HSI ON
     /// HSI oscillator enabled
     pub fn cr_hsion(&self) {
@@ -211,17 +207,23 @@ impl Rcc {
     /// #### @param **enable**
     /// - true: Enable IOPx
     /// - false: Disable IOPx
-    pub fn apb2enr_iop_en(&self, iop_x_en: IOPxEN, enable: bool) {
+    pub fn apb2enr_iop_en(&self, iop_x: u8, enable: bool) -> Result<(), &'static str> {
+        if !(0..=5).contains(&iop_x) {
+            return Err("Invalid I/O port");
+        }
+
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();
-            let bit = iop_x_en as u32;
+            let bit = (iop_x + 2) as u8;
             if enable {
-                apb2enr_val |= (1 << bit); // Enable IOPx
+                apb2enr_val |= 0b1 << bit; // Enable IOPx
             } else {
-                apb2enr_val &= !(1 << bit); // Disable IOPx
+                apb2enr_val &= !(0b1 << bit); // Disable IOPx
             }
             self.apb2enr.write_volatile(apb2enr_val);
         }
+
+        Ok(())
     }
 
     pub fn APB1ENR_I2C1EN(&self, enable: bool) {

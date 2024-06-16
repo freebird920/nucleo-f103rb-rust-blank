@@ -2,7 +2,7 @@ use crate::peripherals::rcc::Rcc;
 
 pub struct TimGp {
     tim_x: u8,
-    cr1: *mut u32,
+    // cr1: *mut u32,
 }
 
 impl TimGp {
@@ -10,7 +10,7 @@ impl TimGp {
     /// **!Important** : TimGp 를 사용하기 전에 먼저 RCC_APB1의 TIMxENR 레지스터를 설정해야 합니다. <br/>
     /// **@param gp_tim_x** x, x = TIMx( 1< x < 6)
     pub fn new(gp_tim_x: u8) -> Result<TimGp,&'static str> {
-        let base: Result<i32, &str> = match gp_tim_x {
+        let base: Result<u32, &str> = match gp_tim_x {
             2 => Ok(0x4000_0000),
             3 => Ok(0x4000_0400),
             4 => Ok(0x4000_0800),
@@ -26,7 +26,7 @@ impl TimGp {
         Ok(
         TimGp {
             tim_x: gp_tim_x,
-            cr1: (base_value + 0x00) as *mut u32,
+            // cr1: (base_value + 0x00) as *mut u32,
         })
     }
 

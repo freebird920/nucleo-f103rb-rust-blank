@@ -3,9 +3,9 @@
 #![allow(unused_parens)]
 
 use core::sync::atomic::{AtomicU32, Ordering};
-// use cortex_m::asm::delay;
 use cortex_m_rt::{entry, exception};
 use panic_halt as _;
+use peripherals::gpio::Gpio;
 
 mod core_peripherals;
 mod peripherals;
@@ -27,8 +27,6 @@ static PENDSV_COMMAND: Mutex<RefCell<Option<PendSVCommand>>> = Mutex::new(RefCel
 // PendSVCommand enum 정의
 enum PendSVCommand {
     Log(&'static str),
-    // Reset,
-    // 다른 동작을 여기에 추가할 수 있습니다.
 }
 
 // trigger_command 함수 정의
@@ -39,17 +37,6 @@ fn trigger_pend_sv(command: PendSVCommand) {
     // PendSV 인터럽트를 트리거
     Scb::new().icsr_pendsvset_write();
 }
-
-// test_interrupt 함수 정의
-// fn test_interrupt(num: u8) -> Result<(), &'static str> {
-//     match num {
-//         1 => Ok(()),
-//         _ => {
-//             trigger_pend_sv(PendSVCommand::Log("Invalid number"));
-//             Err("Invalid number")
-//         }
-//     }
-// }
 
 #[entry]
 fn main() -> ! {
@@ -68,27 +55,45 @@ fn main() -> ! {
     );
 
     rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire));
+    // let _ = match TimGp::new(2) {
+    //     Ok(tim2) => {
+    //         tim2.tim_gp_clock_enable();
+    //         trigger_pend_sv(PendSVCommand::Log("TimGp Set"));
+    //     }
+    //     Err(e) => {
+    //         trigger_pend_sv(PendSVCommand::Log(e.trim()));
+    //     }
+    // };
 
-    // 에러 발생 시 trigger_command 호출
-    // let _ = test_interrupt(4);
+    // GPIO A 초기화
+    let gpio_a = Gpio::new(0)
+        .and_then(|gpio_a| {
+            gpio_a.gpio_clock_enable()?;
+            gpio_a.cr_pin_config(5, 0b0001)?; // CNFy + MODEx
+            Ok(gpio_a)
+        })
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio A Init")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
-    // TIM2
-    
-    
-    let _ = match TimGp::new(2) {
-        Ok(tim2) => {
-            tim2.tim_gp_clock_enable();
-            trigger_pend_sv(PendSVCommand::Log("TimGp Set"));
+    // GPIO C 초기화
+    let gpio_c = Gpio::new(0)
+        .and_then(|gpio_c| {
+            gpio_c.gpio_clock_enable()?;
+            gpio_c.cr_pin_config(20, 0b1010)?; // CNFy + MODEx
+            Ok(gpio_c)
+        })
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+    // rcc.apb2enr_iop_en(0, true);
 
-        },
-        Err(_) => {
-            trigger_pend_sv(PendSVCommand::Log("Error Invalid number"));
-        },
-    };
-    
     loop {
-        // rprintln!("Hello, world!");
-        // delay(SYS_CLOCK.load(Ordering::Acquire));
+        // rprintln!("Loop");
+        gpio_a
+            .as_ref()
+            .map(|gpio| {
+                gpio.bsrr_write(5); // Set PA5 (LD2)
+            })
+            .ok();
     }
 }
 
@@ -98,13 +103,12 @@ fn PendSV() {
         if let Some(command) = PENDSV_COMMAND.borrow(cs).take() {
             match command {
                 PendSVCommand::Log(message) => rprintln!("{}", message),
-                // PendSVCommand::Reset => {
-                //     rprintln!("System reset initiated.");
-                //     // 시스템을 리셋하는 코드 (예시)
-                //     // Scb::new().system_reset();
-                // }
-                // 다른 동작을 여기에 추가할 수 있습니다.
             }
         }
     });
+}
+
+#[exception]
+unsafe fn DefaultHandler(irqn: i16) {
+    rprintln!("Unhandled exception (IRQn = {})", irqn);
 }
