@@ -13,7 +13,7 @@ pub struct Rcc {
     // bdcr: *mut u32,
     // csr: *mut u32,
 }
-#[allow(non_snake_case)]
+
 impl Rcc {
     pub fn new() -> Rcc {
         // let base_addr = RCC_BASE;
@@ -185,7 +185,7 @@ impl Rcc {
             self.apb2enr.write_volatile(apb2enr_val);
         }
     }
-    pub fn ABP2ENR_AFIOEN(&self, enable: bool) {
+    pub fn abp2enr_afioen(&self, enable: bool) {
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();
             if enable {

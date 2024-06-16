@@ -5,7 +5,7 @@
 use core::sync::atomic::{AtomicU32, Ordering};
 use cortex_m_rt::{entry, exception};
 use panic_halt as _;
-use peripherals::gpio::Gpio;
+use peripherals::{afio::Afio, gpio::Gpio};
 
 mod core_peripherals;
 mod peripherals;
@@ -76,15 +76,22 @@ fn main() -> ! {
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
     // GPIO C 초기화
-    let gpio_c = Gpio::new(0)
+    let gpio_c = Gpio::new(2)
         .and_then(|gpio_c| {
             gpio_c.gpio_clock_enable()?;
-            gpio_c.cr_pin_config(20, 0b1010)?; // CNFy + MODEx
+            gpio_c.cr_pin_config(13, 0b1010)?; // CNFy + MODEx
             Ok(gpio_c)
         })
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-    // rcc.apb2enr_iop_en(0, true);
+
+    // AFIO 세팅
+    let afio = Afio::new();
+    afio.afio_clock_enable();
+    let _ = afio
+        .exti_cr(2, 13)
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("AFIO Port 2 Pin 13 Set")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
     loop {
         // rprintln!("Loop");
