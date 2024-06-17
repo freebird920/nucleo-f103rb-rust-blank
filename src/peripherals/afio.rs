@@ -2,19 +2,32 @@ use super::rcc::Rcc;
 
 const BASE_AFIO: u32 = 0x4001_0000;
 pub struct Afio {
-    // base: u32,
+    base: u32,
     // evcr: *mut u32,
 }
 
 impl Afio {
     pub fn new() -> Afio {
-        // let base_addr: u32 = BASE_AFIO;
+        let base_addr: u32 = BASE_AFIO;
         Afio {
-            // base: base_addr,
+            base: base_addr,
             // evcr: (base_addr + 0x00) as *mut u32,
         }
     }
 
+    /// ### afio_exticr_read
+    /// **exti_cr_x** 1~4
+    pub fn afio_exticr_read(&self, exti_cr_x: u8) ->Result<u32, &'static str>{
+        match exti_cr_x {
+            1..=4 => (),
+            _ => return Err("Invalid exti_cr_x"),
+        }
+        unsafe {
+            let exticr = (self.base + 0x08 + ((exti_cr_x-1) as u32 * 4)) as *const u32;
+            Ok(exticr.read_volatile())
+
+        }
+    }
     pub fn afio_clock_enable(&self) {
         // RCC_APB2ENR
         Rcc::new().abp2enr_afioen(true);

@@ -179,7 +179,6 @@ impl Rcc {
     //     (self.base + 0x18) as *mut u32
     // }
 
-    #[allow(unused)]
     pub fn enable_adc1(&self) {
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();
@@ -199,6 +198,10 @@ impl Rcc {
             self.apb2enr.write_volatile(apb2enr_val);
         }
     }
+
+    pub fn abp2enr_read(&self) -> u32 {
+        unsafe { self.apb2enr.read_volatile() }
+    } 
     pub fn abp2enr_afioen(&self, enable: bool) {
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();

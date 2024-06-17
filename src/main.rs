@@ -6,7 +6,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 use core_peripherals::nvic::Nvic;
 use cortex_m_rt::{entry, exception};
 use panic_halt as _;
-use peripherals::{afio::Afio, exti::Exti, gpio::Gpio};
+use peripherals::{adc::Adc, afio::Afio, exti::Exti, gpio::Gpio};
 
 mod core_peripherals;
 mod peripherals;
@@ -20,7 +20,11 @@ use crate::peripherals::stk::Stk;
 use crate::peripherals::tim_gp::TimGp;
 use core::cell::RefCell;
 
-use cortex_m::interrupt::{self, Mutex};
+use cortex_m::{
+    asm::delay,
+    delay,
+    interrupt::{self, Mutex},
+};
 
 use rtt_target::{rprintln, rtt_init_print};
 
@@ -79,57 +83,84 @@ fn main() -> ! {
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
     // GPIO C 초기화
-    let gpio_c = Gpio::new(2)
+    let _ = Gpio::new(2)
         .and_then(|gpio_c| {
             gpio_c.gpio_clock_enable()?;
-            gpio_c.cr_pin_config(13, 0b1010)?; // CNFy + MODEx
+            gpio_c.cr_pin_config(13, 0b0100)?; // PC13 -> Input mode with pull-up / pull-down -- USER BUTTON
+            gpio_c.cr_pin_config(0, 0b0000)?;
+            gpio_c.cr_pin_config(1, 0b0000)?;
+            rprintln!("cr 0: {}", gpio_c.cr_read(0)?);
             Ok(gpio_c)
         })
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
-    // AFIO 세팅
+
+    // SET AFIO
     let afio = Afio::new();
     afio.afio_clock_enable();
+    rprintln!("ABP2ENR: {}", rcc.abp2enr_read());
     let _ = afio
         .exti_cr(2, 13)
-        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("AFIO Port 2 Pin 13 Set")))
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("AFIO Port-C Pin-13 Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-
+    let afio_exticr_read = afio.afio_exticr_read(4);
+    rprintln!("AFIO_EXTICR4: {}", afio_exticr_read.unwrap_or(0));
     // EXTI 세팅
     let exti = Exti::new();
-    exti.ftsr_set(40, true);
-    // exti.pr_read(13);
-
+    let _ = exti.imr_set(13, true);
+    exti.ftsr_set(13, true);
     // Nvic 세팅
     let nvic = Nvic::new(40)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Nvic Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-
     nvic.as_ref()
         .map(|nvic| {
             nvic.iser_set(40, true);
         })
         .ok();
 
+    // ADC 세팅
+    let adc = Adc::new(1)
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("ADC Set")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
+    adc.as_ref().ok().map(|adc| {
+        adc.cr2_adon(true); // ADC ON
+        adc.cr2_cont(true); // 연속변환모드
+        adc.cr2_cal(); // 보정
+        let _ = adc.smpr_smp(10,0b101);
+        let _ = adc.smpr_smp(11,0b101);
+        adc.sqr3_sq(1, 10);
+        adc.sqr3_sq(2, 10);
+        adc.cr2_swstart(true);
+
+    });
 
     loop {
         // rprintln!("Loop");
-        gpio_a
-            .as_ref()
-            .map(|gpio| {
-                gpio.bsrr_write(5); // Set PA5 (LD2)
-            })
-            .ok();
+        gpio_a.as_ref().ok().map(|gpio| {
+            gpio.bsrr_write(5); // Set PA5 (LD2)
+        });
+        // let read_value = gpio_c.as_ref().map(|gpio| gpio.idr_read(13)).unwrap_or(0);
+        // rprintln!("Read Value: {}", read_value);
+        // delay(9_000*1000);
     }
 }
 #[exception]
 unsafe fn DefaultHandler(irqn: i16) {
     rprintln!("Unhandled exception (IRQn = {})", irqn);
+    match irqn {
+        40 => {
+            rprintln!("EXTI15_10");
+            let exti = Exti::new();
+            let pr = exti.pr_read(13);
+            rprintln!("PR: {}", pr);
+            exti.pr_clear(13);
+        }
+        _ => (),
+    }
     // Exti::new().pr_clear(13);
-
-
 }
 
 #[exception]
@@ -142,5 +173,3 @@ fn PendSV() {
         }
     });
 }
-
-

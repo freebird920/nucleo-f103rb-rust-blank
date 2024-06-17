@@ -90,13 +90,22 @@ impl Gpio {
         }
         Ok(())
     }
+
+    pub fn cr_read(&self, pin: u8) -> Result<u32, &'static str> {
+        let cr_x = self.cr_x(pin)?;
+        let shift = (pin % 8) * 4;
+        unsafe {
+            Ok((cr_x.read_volatile() & (0b1111 << shift)) >> shift)
+        }
+    }
+
     pub fn bsrr_write(&self, port: u8) {
         unsafe {
             self.bsrr.write_volatile(0b1 << port);
         }
     }
 
-
+    
     pub fn bsrr_reset(&self, port: u8) {
         unsafe {
             self.bsrr.write_volatile(1 << (port + 16));

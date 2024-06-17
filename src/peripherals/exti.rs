@@ -45,7 +45,7 @@ impl Exti {
     }
 
 
-    pub fn rstr_set(&self, tr_x: u8, val: bool) {
+    pub fn rtsr_set(&self, tr_x: u8, val: bool) {
         unsafe {
             let mut rtsr_val = self.rtsr.read_volatile();
             if val {

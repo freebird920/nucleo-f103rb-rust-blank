@@ -1,6 +1,7 @@
-const BASE_NVIC: u32 = 0xE000_EF00;
+const BASE_NVIC: u32 = 0xE000_E100;
 
 pub struct Nvic {
+    
     iser_x: *mut u32,
 }
 
