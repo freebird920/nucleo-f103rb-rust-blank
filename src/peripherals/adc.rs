@@ -39,6 +39,20 @@ impl Adc {
     pub fn base_read(&self) -> u32 {
         self.base
     }
+    pub fn cr1_read(&self) -> u32 {
+        unsafe { self.cr1.read_volatile() }
+    }
+    pub fn cr1_scan(&self, enable: bool) {
+        unsafe {
+            let mut adc_cr1_val = self.cr1.read_volatile();
+            if enable {
+                adc_cr1_val |= (1 << 8); // Enable scan mode
+            } else {
+                adc_cr1_val &= !(1 << 8); // Disable scan mode
+            }
+            self.cr1.write_volatile(adc_cr1_val);
+        }
+    }
     pub fn cr2_read(&self) -> u32 {
         unsafe { self.cr2.read_volatile() }
     }
