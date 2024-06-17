@@ -95,7 +95,6 @@ fn main() -> ! {
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
-
     // SET AFIO
     let afio = Afio::new();
     afio.afio_clock_enable();
@@ -119,22 +118,49 @@ fn main() -> ! {
             nvic.iser_set(40, true);
         })
         .ok();
-
     // ADC 세팅
+    unsafe{
+        let target_addr: u32 = 0x4002_1000;
+        let apb2enr_addr =( target_addr + 0x18 )as *mut u32;
+        let mut  apb2enr_val = apb2enr_addr.read_volatile();
+        rprintln!("apb2enr_val: {}", apb2enr_val);
+        apb2enr_val |= 1 <<10;
+        apb2enr_addr.write_volatile(apb2enr_val);
+        rprintln!("apb2enr_val2: {}", apb2enr_addr.read_volatile());
+    }
+    rcc.enable_adc1();
+
+    rprintln!("abp2enr: {}", rcc.abp2enr_read());
     let adc = Adc::new(1)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("ADC Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-
-    adc.as_ref().ok().map(|adc| {
+    let _ = adc.as_ref().map(|adc| {
         adc.cr2_adon(true); // ADC ON
-        adc.cr2_cont(true); // 연속변환모드
-        adc.cr2_cal(); // 보정
-        let _ = adc.smpr_smp(10,0b101);
-        let _ = adc.smpr_smp(11,0b101);
-        adc.sqr3_sq(1, 10);
-        adc.sqr3_sq(2, 10);
-        adc.cr2_swstart(true);
+        delay(14);
+        // delay(9_000*64*100);
+        adc.cr2_extsel(111);
+        rprintln!("cr2_addr = {}", adc.cr2_addr());
 
+        rprintln!("base_read {}", adc.base_read());
+        adc.cr2_cont(false); // 연속변환모드
+        adc.cr2_cal(); // 보정
+        rprintln!("cr2_read {}", adc.cr2_read());
+
+        let _ = adc.smpr_smp(10, 0b101);
+        // let _ = adc.smpr_smp(11, 0b101);
+        adc.sqr3_sq(1, 10);
+        // adc.sqr3_sq(2, 11);
+        let sqr_val = adc.sqr_read(3);
+        rprintln!("ADC SQR3: {}", sqr_val);
+        adc.cr2_swstart(true);
+        rprintln!("cr2_swstart");
+        // while adc.sr_eoc_read() == false {}
+        while !adc.sr_eoc_read() {
+            rprintln!("Waiting for EOC...");
+        }
+        // delay(9_000*64*100);
+        let dr_read = adc.dr_data();
+        rprintln!("ADC DR: {}", dr_read);
     });
 
     loop {

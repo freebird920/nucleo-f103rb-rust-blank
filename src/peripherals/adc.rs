@@ -15,7 +15,7 @@ impl Adc {
     /// ### Adc::new
     /// **adc_x** 1 | 2
     pub fn new(adc_x: u8) -> Result<Adc, &'static str> {
-        let base_addr = match adc_x {
+        let base_addr: u32 = match adc_x {
             1 => 0x4001_2800,
             2 => 0x4001_2400,
             _ => return Err("Invalid ADC number"),
@@ -34,7 +34,15 @@ impl Adc {
             smpr2: (base_addr + 0x10) as *mut u32,
         })
     }
-
+    pub fn base_read(&self) -> u32 {
+        self.base
+    }
+    pub fn cr2_read(&self) -> u32 {
+        unsafe { self.cr2.read_volatile() }
+    }
+    pub fn cr2_addr(&self) -> u32 {
+        self.cr2 as u32
+    }
     /// ### CR1_ADON -  A/D Converter ON / OFF
     /// - ADC 제어 레지스터에서 ADON 비트 이외의 다른 비트가 동시에 변경되면 변환이 트리거되지 않음. <br/>
     /// - 만약 ADON 비트 이외의 다른 비트를 변경할 때 ADON 비트를 함께 변경하려고 하면, 변환이 트리거되지 않습니다. <br/>
@@ -42,13 +50,16 @@ impl Adc {
     pub fn cr2_adon(&self, enable: bool) {
         unsafe {
             let mut adc_cr2_val = self.cr2.read_volatile();
+            
             if enable {
                 adc_cr2_val |= (1 << 0); // Enable ADC
             } else {
                 adc_cr2_val &= !(1 << 0); // Disable ADC
             }
+            
             self.cr2.write_volatile(adc_cr2_val);
         }
+
     }
     // ## cr2_cont
     /// ### CR2_CONT - Continuous Conversion
@@ -141,15 +152,26 @@ impl Adc {
         }
     }
     pub fn sr_eoc_read(&self) -> bool {
-        unsafe { self.sr.read_volatile() & (0b1 << 1) == 1 }
+        unsafe { self.sr.read_volatile() & (0b1 << 1) != 0 }
     }
-    pub fn sqr3_sq(&self, seq: u8, channel: u32) {
+
+pub fn sqr3_sq(&self, seq: u8, channel: u32) {
+    unsafe {
+        let mut adc_sqr3_val = self.seq3.read_volatile();
+        let shift = (seq - 1) * 5;
+        adc_sqr3_val &= !(0b11111 << shift); // Clear the bits
+        adc_sqr3_val |= (channel & 0b11111) << shift; // Set the bits
+        self.seq3.write_volatile(adc_sqr3_val);
+    }
+}
+    pub fn sqr_read(&self, seq: u8) -> u32 {
         unsafe {
-            let mut adc_sqr3_val = self.seq3.read_volatile();
-            let shift = (seq - 1) * 5;
-            adc_sqr3_val &= !(0b11111 << shift); // Clear the bits
-            adc_sqr3_val |= (channel) << shift; // Set the bits
-            self.seq3.write_volatile(adc_sqr3_val);
+            match seq {
+                1 => self.seq1.read_volatile(),
+                2 => self.seq2.read_volatile(),
+                3 => self.seq3.read_volatile(),
+                _ => 0,
+            }
         }
     }
     pub fn sqr_sq(&self, seq: u8, channel: u32) {
@@ -168,8 +190,8 @@ impl Adc {
         }
     }
 
-    pub fn dr_data(&self) -> u16 {
-        unsafe { self.dr.read_volatile() as u16 }
+    pub fn dr_data(&self) -> u32 {
+        unsafe { self.dr.read_volatile() as u32 }
     }
 
     pub fn sr_eoc(&self) -> bool {
