@@ -2,27 +2,35 @@
 #![no_main]
 #![allow(unused_parens)]
 
+// core 라이브러리 사용
+use core::cell::RefCell;
 use core::sync::atomic::{AtomicU32, Ordering};
-use core_peripherals::nvic::Nvic;
-use cortex_m_rt::{entry, exception};
-use panic_halt as _;
-use peripherals::{adc::Adc, afio::Afio, exti::Exti, gpio::Gpio};
 
+// 모듈
 mod core_peripherals;
 mod peripherals;
 mod utils;
 
-use crate::core_peripherals::scb::Scb;
+
+// 커스텀 라이브러리
+use crate::peripherals::adc::Adc;
+use crate::peripherals::afio::Afio;
+use crate::peripherals::exti::Exti;
+use crate::peripherals::gpio::Gpio;
 use crate::peripherals::rcc::Rcc;
 use crate::peripherals::stk::Stk;
-
 #[allow(unused)]
 use crate::peripherals::tim_gp::TimGp;
-use core::cell::RefCell;
 
+use crate::core_peripherals::scb::Scb;
+use crate::core_peripherals::nvic::Nvic;
+
+
+
+use panic_halt as _;
+use cortex_m_rt::{entry, exception};
 use cortex_m::{
     asm::delay,
-    delay,
     interrupt::{self, Mutex},
 };
 
@@ -87,8 +95,8 @@ fn main() -> ! {
         .and_then(|gpio_c| {
             gpio_c.gpio_clock_enable()?;
             gpio_c.cr_pin_config(13, 0b0100)?; // PC13 -> Input mode with pull-up / pull-down -- USER BUTTON
-            gpio_c.cr_pin_config(0, 0b0000)?;
-            gpio_c.cr_pin_config(1, 0b0000)?;
+            gpio_c.cr_pin_config(1, 0b0000)?; // PC1 -> Analog mode (Y axis of joystick)
+            gpio_c.cr_pin_config(0, 0b0000)?; // PC0 -> Analog mode (X axis of joystick)
             rprintln!("cr 0: {}", gpio_c.cr_read(0)?);
             Ok(gpio_c)
         })
@@ -119,17 +127,8 @@ fn main() -> ! {
         })
         .ok();
     // ADC 세팅
-    unsafe{
-        let target_addr: u32 = 0x4002_1000;
-        let apb2enr_addr =( target_addr + 0x18 )as *mut u32;
-        let mut  apb2enr_val = apb2enr_addr.read_volatile();
-        rprintln!("apb2enr_val: {}", apb2enr_val);
-        apb2enr_val |= 1 <<10;
-        apb2enr_addr.write_volatile(apb2enr_val);
-        rprintln!("apb2enr_val2: {}", apb2enr_addr.read_volatile());
-    }
-    rcc.enable_adc1();
 
+    rcc.enable_adc1();
     rprintln!("abp2enr: {}", rcc.abp2enr_read());
     let adc = Adc::new(1)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("ADC Set")))
@@ -137,50 +136,36 @@ fn main() -> ! {
     let _ = adc.as_ref().map(|adc| {
         adc.cr2_adon(true); // ADC ON
         delay(14);
-        // delay(9_000*64*100);
-        adc.cr2_extsel(111);
-        rprintln!("cr2_addr = {}", adc.cr2_addr());
-
-        rprintln!("base_read {}", adc.base_read());
-        adc.cr2_cont(false); // 연속변환모드
+        adc.cr2_extsel(111); // Software start
+        adc.cr2_cont(true); // 단일 변환 모드
         adc.cr2_cal(); // 보정
         rprintln!("cr2_read {}", adc.cr2_read());
 
-        let _ = adc.smpr_smp(10, 0b101);
-        let _ = adc.smpr_smp(11, 0b101);
-        adc.sqr3_sq(1, 10);
-        adc.sqr3_sq(2, 11);
-        let sqr_val = adc.sqr_read(3);
-        rprintln!("ADC SQR3: {}", sqr_val);
-        adc.cr2_swstart(true);
-        rprintln!("cr2_swstart");
-        // while adc.sr_eoc_read() == false {}
-        while !adc.sr_eoc_read() {
-            rprintln!("Waiting for EOC...");
-        }
-        // delay(9_000*64*100);
-        let dr_read = adc.dr_data();
-        rprintln!("ADC DR: {}", dr_read);
-                adc.cr2_swstart(true);
-        rprintln!("cr2_swstart");
-        // while adc.sr_eoc_read() == false {}
-        while !adc.sr_eoc_read() {
-            rprintln!("Waiting for EOC...");
-        }
-        // delay(9_000*64*100);
-        let dr_read = adc.dr_data();
-        rprintln!("ADC DR: {}", dr_read);
+        let _ = adc.smpr_smp(10, 0b101); // 채널 10 샘플링 시간 설정
+        let _ = adc.smpr_smp(11, 0b101); // 채널 11 샘플링 시간 설정
+        adc.sqr3_sq(1, 10); // 첫 번째 변환을 채널 10으로 설정
+        adc.sqr3_sq(2, 11); // 두 번째 변환을 채널 11으로 설정
+        let _ = adc.sqr_l(1); // 두 개의 변환을 수행하도록 설정
 
+        rprintln!("ADC 설정 완료");
 
-        adc.cr2_swstart(true);
-        rprintln!("cr2_swstart");
-        // while adc.sr_eoc_read() == false {}
+        // 첫 번째 변환 (PC0)
+        adc.cr2_swstart(true); // 변환 시작
         while !adc.sr_eoc_read() {
-            rprintln!("Waiting for EOC...");
+            // 변환 완료 대기
         }
-        // delay(9_000*64*100);
-        let dr_read = adc.dr_data();
-        rprintln!("ADC DR: {}", dr_read);
+        let dr_read_pc0 = adc.dr_data();
+        rprintln!("ADC DR (PC0): {}", dr_read_pc0);
+        while !adc.sr_eoc_read() {
+            // 변환 완료 대기
+        }
+        // 두 번째 변환 (PC1)
+        adc.cr2_swstart(true); // 변환 시작
+        while !adc.sr_eoc_read() {
+            // 변환 완료 대기
+        }
+        let dr_read_pc1 = adc.dr_data();
+        rprintln!("ADC DR (PC1): {}", dr_read_pc1);
     });
 
     loop {

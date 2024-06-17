@@ -187,6 +187,13 @@ impl Rcc {
             self.apb2enr.write_volatile(apb2enr_val);
         }
     }
+    pub fn enable_adc2(&self) {
+        unsafe {
+            let mut apb2enr_val = self.apb2enr.read_volatile();
+            apb2enr_val |= (1 << 10); // ADC2 클럭 활성화
+            self.apb2enr.write_volatile(apb2enr_val);
+        }
+    }
 
     pub fn APB2ENR_ADC1EN(&self, enable: bool) {
         unsafe {

@@ -1,4 +1,6 @@
+
 pub struct Adc {
+    // #[allow(dead_code)]
     base: u32, // Storing the base address directly as u32
     sr: *mut u32,
     cr1: *mut u32,
@@ -16,8 +18,8 @@ impl Adc {
     /// **adc_x** 1 | 2
     pub fn new(adc_x: u8) -> Result<Adc, &'static str> {
         let base_addr: u32 = match adc_x {
-            1 => 0x4001_2800,
-            2 => 0x4001_2400,
+            1 => 0x4001_2400,
+            2 => 0x4001_2800,
             _ => return Err("Invalid ADC number"),
         };
 
@@ -158,11 +160,25 @@ impl Adc {
 pub fn sqr3_sq(&self, seq: u8, channel: u32) {
     unsafe {
         let mut adc_sqr3_val = self.seq3.read_volatile();
-        let shift = (seq - 1) * 5;
+        let shift = (seq-1) * 5;
         adc_sqr3_val &= !(0b11111 << shift); // Clear the bits
-        adc_sqr3_val |= (channel & 0b11111) << shift; // Set the bits
+        adc_sqr3_val |= (channel) << shift; // Set the bits
         self.seq3.write_volatile(adc_sqr3_val);
     }
+}
+
+pub fn sqr_l(&self, l:u32)-> Result<(), &'static str>{
+    match l {
+        0..=15 => (),
+        _ => return Err("Invalid sequence length"),
+    }
+    unsafe {
+        let mut adc_sqr1_val = self.seq1.read_volatile();
+        adc_sqr1_val &= !(0b1111 << 20); // Clear the bits
+        adc_sqr1_val |= (l) << 20; // Set the bits
+        self.seq1.write_volatile(adc_sqr1_val);
+    }
+    Ok(())
 }
     pub fn sqr_read(&self, seq: u8) -> u32 {
         unsafe {

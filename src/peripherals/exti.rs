@@ -3,6 +3,7 @@ pub struct Exti {
     // base: u32,
     imr:    *mut u32,
     // emr:    *mut u32,
+    #[allow(dead_code)]
     rtsr:   *mut u32,
     ftsr:   *mut u32,
     // swier:  *mut u32,
@@ -44,7 +45,7 @@ impl Exti {
         Ok(())
     }
 
-
+    #[allow(dead_code)]
     pub fn rtsr_set(&self, tr_x: u8, val: bool) {
         unsafe {
             let mut rtsr_val = self.rtsr.read_volatile();
