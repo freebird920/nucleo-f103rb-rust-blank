@@ -147,11 +147,31 @@ fn main() -> ! {
         rprintln!("cr2_read {}", adc.cr2_read());
 
         let _ = adc.smpr_smp(10, 0b101);
-        // let _ = adc.smpr_smp(11, 0b101);
+        let _ = adc.smpr_smp(11, 0b101);
         adc.sqr3_sq(1, 10);
-        // adc.sqr3_sq(2, 11);
+        adc.sqr3_sq(2, 11);
         let sqr_val = adc.sqr_read(3);
         rprintln!("ADC SQR3: {}", sqr_val);
+        adc.cr2_swstart(true);
+        rprintln!("cr2_swstart");
+        // while adc.sr_eoc_read() == false {}
+        while !adc.sr_eoc_read() {
+            rprintln!("Waiting for EOC...");
+        }
+        // delay(9_000*64*100);
+        let dr_read = adc.dr_data();
+        rprintln!("ADC DR: {}", dr_read);
+                adc.cr2_swstart(true);
+        rprintln!("cr2_swstart");
+        // while adc.sr_eoc_read() == false {}
+        while !adc.sr_eoc_read() {
+            rprintln!("Waiting for EOC...");
+        }
+        // delay(9_000*64*100);
+        let dr_read = adc.dr_data();
+        rprintln!("ADC DR: {}", dr_read);
+
+
         adc.cr2_swstart(true);
         rprintln!("cr2_swstart");
         // while adc.sr_eoc_read() == false {}
