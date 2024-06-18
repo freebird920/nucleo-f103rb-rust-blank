@@ -6,7 +6,8 @@ use crate::utils::delay::{delay_sys_clk_ms, delay_sys_clk_10us};
 use super::rcc::Rcc;
 
 pub struct I2c {
-    sys_clock: u32,
+    rcc: Rcc,
+    i2c_x: u8,
     cr1: *mut u32,
     cr2: *mut u32,
     ccr: *mut u32,
@@ -20,8 +21,8 @@ pub struct I2c {
 impl I2c {
     /// ### I2c::new
     /// **I2c_x** 1 | 2
-    pub fn new(I2c_x : u8) -> Result<I2c, &'static str> {
-        let base: u32 = match I2c_x {
+    pub fn new(i2c_x : u8) -> Result<I2c, &'static str> {
+        let base: u32 = match i2c_x {
             1 => 0x40005400,
             2 => 0x40005800,
             _ => return Err("Invalid I2C number"),
@@ -29,7 +30,8 @@ impl I2c {
         let rcc = Rcc::new();
         Ok(    
         I2c { 
-            sys_clock: rcc.get_sys_clock(),
+            rcc: Rcc::new(),
+            i2c_x : i2c_x, 
             cr1: (base + 0x00) as *mut u32,
             cr2: (base + 0x04) as *mut u32,
             ccr: (base + 0x1C) as *mut u32,
@@ -41,6 +43,14 @@ impl I2c {
 
          )
     }
+    pub fn I2c_clock_enable(&self,){
+        match self.i2c_x {
+            1 => self.rcc.enable_i2c1(),
+            2 => self.rcc.enable_i2c2(),
+            _ => (),
+        }
+    }
+
     pub fn cr1_pe(&self, enable: bool) {
         unsafe {
             let mut cr1_val = self.cr1.read_volatile();
@@ -52,42 +62,90 @@ impl I2c {
             self.cr1.write_volatile(cr1_val);
         }
     }
+
     pub fn cr2_freq(&self, freq: u32) {
         if (freq > 0b110010) {
             panic!("FREQ value is out of range FREQ > 50MHz NOT ALLOWED");
         };
         unsafe {
+            self.rcc.cfgr_ppre1_set(2); // Set APB1 prescaler to 2 -> 32MHz
             let mut cr2_val = self.cr2.read_volatile();
             cr2_val &= !(0b111111 << 0); // Clear FREQ[5:0]
             cr2_val |= (freq << 0); // Set FREQ[5:0] to 8MHz
             self.cr2.write_volatile(cr2_val);
         }
     }
-    pub fn ccr_set(&self, ccr: u32) {
+    pub fn ccr_set_std(&self) {
         unsafe {
+            let sys_clock = self.rcc.get_sys_clock();
+            let ppre1_val = self.rcc.cfgr_ppre1_read();
+            let apb1_clock = sys_clock / ppre1_val;
+
+            // 표준 모드에서 100kHz 설정
+            let i2c_clock = 100_000;
+            let ccr = (apb1_clock / (i2c_clock * 2)) as u32;
+
+            // I2C_CCR 레지스터 설정
             let mut ccr_val = self.ccr.read_volatile();
             ccr_val &= !(0b1111_1111_1111 << 0); // Clear CCR[11:0]
-            ccr_val |= (ccr << 0);
+            ccr_val |= (ccr & 0b1111_1111_1111); // Set CCR[11:0]
             self.ccr.write_volatile(ccr_val);
+
+            // TRISE 설정
+            let trise = (apb1_clock / 1_000_000) + 1; // 표준 모드 (1000ns / T_PCLK1) + 1
+            self.trise.write_volatile(trise as u32);
         }
     }
-    pub fn trise_set(&self, trise: u32) {
+
+    pub fn ccr_set_fast(&self, duty: u8) {
         unsafe {
+            let sys_clock = self.rcc.get_sys_clock();
+            let ppre1_val = self.rcc.cfgr_ppre1_read();
+            let apb1_clock = sys_clock / ppre1_val;
+
+            // 패스트 모드에서 400kHz 설정
+            let i2c_clock = 400_000;
+            let ccr = if duty == 0 {
+                (apb1_clock / (i2c_clock * 3)) as u32 // DUTY 0: T_low/T_high = 2
+            } else {
+                (apb1_clock / (i2c_clock * 25)) as u32 // DUTY 1: T_low/T_high = 16/9
+            };
+
+            // I2C_CCR 레지스터 설정
+            let mut ccr_val = self.ccr.read_volatile();
+            ccr_val &= !(0b1111_1111_1111 << 0); // Clear CCR[11:0]
+            ccr_val |= (ccr & 0b1111_1111_1111); // Set CCR[11:0]
+            ccr_val |= 0x8000; // FS 비트 설정 (패스트 모드)
+            if duty == 1 {
+                ccr_val |= 0x4000; // DUTY 비트 설정
+            }
+            self.ccr.write_volatile(ccr_val);
+
+            // TRISE 설정
+            let trise = (apb1_clock / 3_000_000) + 1; // 패스트 모드 (300ns / T_PCLK1) + 1
+            self.trise.write_volatile(trise as u32);
+        }
+    }
+
+
+    /// ### I2c::trise_set
+    /// **Important** TRISE must be configured only when the I2C is disabled (PE = 0)
+    /// **trise** TRISE[5:0] bits are used to configure the maximum rise time of SCL
+    pub fn trise_set(&self, trise: u32) ->Result<(), &'static str> {
+        unsafe {
+            if (trise > 0b11111) {
+                return Err("TRISE value is out of range TRISE > 31 NOT ALLOWED");
+            };
             let mut trise_val = self.trise.read_volatile();
             trise_val &= !(0b11111 << 0); // Clear TRISE[5:0]
             trise_val |= (trise << 0);
             self.trise.write_volatile(trise_val);
+            Ok(())
         }
     }
-    pub fn init(&self) {
-        self.cr1_pe(false); // Disable I2C
-        self.cr2_freq(8); // Set FREQ[5:0] to 8MHz
-        self.ccr_set(40); // Set CCR[11:0] to 40 (Standard mode, 100 kHz)
-        self.trise_set(9); // Set TRISE[5:0] to 9
-        self.cr1_pe(true); // Enable I2C
 
-        delay_sys_clk_ms(50);
-    }
+
+
     pub fn cr1_start(&self) {
         unsafe {
             let mut cr1_val = self.cr1.read_volatile();

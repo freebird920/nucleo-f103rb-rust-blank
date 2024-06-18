@@ -149,7 +149,6 @@ impl Rcc {
     }
 
 
-    #[allow(unused)]
     /// ## CFGR_ADCPRE - ADC prescaler
     /// #### @param **adcpre**
     /// **IMPORTANT** PLCK2 / ADCPRE > 14MHz <br/>
@@ -163,6 +162,46 @@ impl Rcc {
             rcc_cfgr_val &= !(0b11 << 14); // Clear ADCPRE bits
             rcc_cfgr_val |= (adcpre << 14); // Set ADCPRE bits
             self.cfgr.write_volatile(rcc_cfgr_val);
+        }
+    }
+
+    /// ## CFGR_PPRE1 - APB1 Low-speed prescaler (APB1)
+    /// @param **ppre1** <br/>
+    /// - 0 // not devided
+    /// - 2 // divided by 2
+    /// - 4 // divided by 4
+    /// - 8 // divided by 8
+    /// - 16 // divided by 16
+    pub fn cfgr_ppre1_set(&self, ppre1: u32) {
+        unsafe {
+            let ppre1_val = match ppre1 {
+                0 => 0b000,
+                2 => 0b100,
+                4 => 0b101,
+                8 => 0b110,
+                16 => 0b111,
+                _ => 0b000,
+            };
+            let mut rcc_cfgr_val = self.cfgr.read_volatile();
+            rcc_cfgr_val &= !(0b111 << 8); // Clear PPRE1 bits
+            if ppre1_val != 0b000 {
+                rcc_cfgr_val |= (ppre1_val << 8); // Set PPRE1 bits
+            }
+            self.cfgr.write_volatile(rcc_cfgr_val);
+        }
+    }
+    pub fn cfgr_ppre1_read(&self) -> u32 {
+        unsafe {
+            let rcc_cfgr_val = self.cfgr.read_volatile();
+            let ppre1 = (rcc_cfgr_val >> 8) & 0b111; 
+            match ppre1 {
+                0b000 => 1,
+                0b100 => 2,
+                0b101 => 4,
+                0b110 => 8,
+                0b111 => 16,
+                _ => 1,
+            }
         }
     }
 
@@ -194,18 +233,21 @@ impl Rcc {
             self.apb2enr.write_volatile(apb2enr_val);
         }
     }
-
-    pub fn APB2ENR_ADC1EN(&self, enable: bool) {
+    pub fn enable_i2c1(&self) {
         unsafe {
-            let mut apb2enr_val = self.apb2enr.read_volatile();
-            if enable {
-                apb2enr_val |= (1 << 9); // Enable ADC1
-            } else {
-                apb2enr_val &= !(1 << 9); // Disable ADC1
-            }
-            self.apb2enr.write_volatile(apb2enr_val);
+            let mut apb1enr_val = self.apb1enr.read_volatile();
+            apb1enr_val |= (1 << 21); // I2C1 클럭 활성화
+            self.apb1enr.write_volatile(apb1enr_val);
         }
     }
+    pub fn enable_i2c2(&self) {
+        unsafe {
+            let mut apb1enr_val = self.apb1enr.read_volatile();
+            apb1enr_val |= (1 << 22); // I2C2 클럭 활성화
+            self.apb1enr.write_volatile(apb1enr_val);
+        }
+    }
+
 
     pub fn abp2enr_read(&self) -> u32 {
         unsafe { self.apb2enr.read_volatile() }

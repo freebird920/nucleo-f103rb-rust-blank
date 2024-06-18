@@ -34,6 +34,7 @@ use cortex_m::{
     interrupt::{self, Mutex},
 };
 
+use peripherals::i2c::I2c;
 use rtt_target::{rprintln, rtt_init_print};
 
 static SYS_CLOCK: AtomicU32 = AtomicU32::new(0);
@@ -94,6 +95,20 @@ fn main() -> ! {
         })
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+    
+    // I2c 초기화
+    let i2c2 = I2c::new(2)
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("I2C2 Init")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+    let _ = i2c2.as_ref().ok().as_ref().map(|i2c| {
+        i2c.I2c_clock_enable();     // enable I2C2 clock
+        i2c.cr1_pe(false);          // disable I2C2 - 먼저 I2C2를 비활성화 한 후 설정 시작
+        i2c.cr2_freq(32);           // 32MHz 클럭 설정
+        i2c.ccr_set_std();          // 표준 모드 설정
+        i2c.cr1_pe(true);           // enable I2C2 - 설정 완료 후 I2C2 활성화
+        
+
+    });
 
     
     // TIM2 세팅
