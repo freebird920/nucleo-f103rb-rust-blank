@@ -1,3 +1,4 @@
+```rust
 #![no_std]
 #![no_main]
 #![allow(unused_parens)]
@@ -53,8 +54,6 @@ fn trigger_pend_sv(command: PendSVCommand) {
     Scb::new().icsr_pendsvset_write();
 }
 
-
-
 #[entry]
 fn main() -> ! {
     rtt_init_print!();
@@ -72,6 +71,15 @@ fn main() -> ! {
     );
 
     rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire));
+    // let _ = match TimGp::new(2) {
+    //     Ok(tim2) => {
+    //         tim2.tim_gp_clock_enable();
+    //         trigger_pend_sv(PendSVCommand::Log("TimGp Set"));
+    //     }
+    //     Err(e) => {
+    //         trigger_pend_sv(PendSVCommand::Log(e.trim()));
+    //     }
+    // };
 
     // GPIO A 초기화
     let gpio_a = Gpio::new(0)
@@ -115,30 +123,26 @@ fn main() -> ! {
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
     nvic.as_ref()
         .map(|nvic| {
-            nvic.iser_set(18, true);
             nvic.iser_set(40, true);
         })
         .ok();
     // ADC 세팅
 
-    
+    rcc.enable_adc1();
     rprintln!("abp2enr: {}", rcc.abp2enr_read());
     let adc = Adc::new(1)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("ADC Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
     let _ = adc.as_ref().map(|adc| {
-        rcc.enable_adc1();
         adc.cr2_adon(true); // ADC ON
         delay(14);
         adc.cr1_scan(true); // 스캔 모드 활성화
-        adc.cr1_eocie_set(true); // EOC 인터럽트 활성화
-
+        
         adc.cr2_extsel(111); // Software start
         adc.cr2_cont(true); // 연속 변환모드
 
 
         adc.cr2_cal(); // 보정
-        rprintln!("cr1_read {}", adc.cr1_read());
         rprintln!("cr2_read {}", adc.cr2_read());
 
         let _ = adc.smpr_smp(10, 0b101); // 채널 10 샘플링 시간 설정
@@ -181,12 +185,6 @@ fn main() -> ! {
 unsafe fn DefaultHandler(irqn: i16) {
     rprintln!("Unhandled exception (IRQn = {})", irqn);
     match irqn {
-        18 => {
-            rprintln!("ADC1_2 interrupt");
-            let adc = Adc::new(1);
-            let dr_read = adc.as_ref().map(|adc| adc.dr_data());
-            rprintln!("ADC DR: {}", dr_read.unwrap_or(0));
-        },
         40 => {
             rprintln!("EXTI15_10");
             let exti = Exti::new();
@@ -194,13 +192,10 @@ unsafe fn DefaultHandler(irqn: i16) {
             rprintln!("PR: {}", pr);
             exti.pr_clear(13);
         }
-        _ => { ()
-            // let exti = Exti::new();
-            // exti.pr_clear(irqn as u8)
-        },
+        _ => (),
     }
+    // Exti::new().pr_clear(13);
 }
-
 
 #[exception]
 fn PendSV() {
@@ -208,8 +203,8 @@ fn PendSV() {
         if let Some(command) = PENDSV_COMMAND.borrow(cs).take() {
             match command {
                 PendSVCommand::Log(message) => rprintln!("{}", message),
-                
             }
         }
     });
 }
+```
