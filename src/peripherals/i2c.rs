@@ -3,47 +3,53 @@ use rtt_target::rprintln;
 
 use crate::utils::delay::{delay_sys_clk_ms, delay_sys_clk_10us};
 
-pub enum I2C_BASE {
-    BASE_I2C2 = 0x4000_5800,
-}
-pub struct I2C {
-    base: u32,
+use super::rcc::Rcc;
+
+pub struct I2c {
+    sys_clock: u32,
+    cr1: *mut u32,
+    cr2: *mut u32,
+    ccr: *mut u32,
+    trise: *mut u32,
+    sr1: *mut u32,
+    sr2: *mut u32,
+    dr: *mut u32,
+    
 }
 
-impl I2C {
-    pub fn new(base: I2C_BASE) -> I2C {
-        I2C { base: base as u32 }
-    }
-    fn CR1(&self) -> *mut u32 {
-        (self.base + 0x00) as *mut u32
-    }
-    fn CR2(&self) -> *mut u32 {
-        (self.base + 0x04) as *mut u32
-    }
-    fn CCR(&self) -> *mut u32 {
-        (self.base + 0x1C) as *mut u32
-    }
-    fn TRISE(&self) -> *mut u32 {
-        (self.base + 0x20) as *mut u32
-    }
-    fn SR1(&self) -> *mut u32 {
-        (self.base + 0x14) as *mut u32
-    }
-    fn SR2(&self) -> *mut u32 {
-        (self.base + 0x18) as *mut u32
-    }
-    fn DR(&self) -> *mut u32 {
-        (self.base + 0x10) as *mut u32
+impl I2c {
+    /// ### I2c::new
+    /// **I2c_x** 1 | 2
+    pub fn new(I2c_x : u8) -> Result<I2c, &'static str> {
+        let base: u32 = match I2c_x {
+            1 => 0x40005400,
+            2 => 0x40005800,
+            _ => return Err("Invalid I2C number"),
+        };
+        let rcc = Rcc::new();
+        Ok(    
+        I2c { 
+            sys_clock: rcc.get_sys_clock(),
+            cr1: (base + 0x00) as *mut u32,
+            cr2: (base + 0x04) as *mut u32,
+            ccr: (base + 0x1C) as *mut u32,
+            trise: (base + 0x20) as *mut u32,
+            sr1: (base + 0x14) as *mut u32,
+            sr2: (base + 0x18) as *mut u32,
+            dr: (base + 0x10) as *mut u32,
+         }
+
+         )
     }
     pub fn cr1_pe(&self, enable: bool) {
         unsafe {
-            let mut cr1_val = self.CR1().read_volatile();
+            let mut cr1_val = self.cr1.read_volatile();
             if enable {
                 cr1_val |= (1 << 0); // Enable I2C
             } else {
                 cr1_val &= !(1 << 0); // Disable I2C
             }
-            self.CR1().write_volatile(cr1_val);
+            self.cr1.write_volatile(cr1_val);
         }
     }
     pub fn cr2_freq(&self, freq: u32) {
@@ -51,26 +57,26 @@ impl I2C {
             panic!("FREQ value is out of range FREQ > 50MHz NOT ALLOWED");
         };
         unsafe {
-            let mut cr2_val = self.CR2().read_volatile();
+            let mut cr2_val = self.cr2.read_volatile();
             cr2_val &= !(0b111111 << 0); // Clear FREQ[5:0]
             cr2_val |= (freq << 0); // Set FREQ[5:0] to 8MHz
-            self.CR2().write_volatile(cr2_val);
+            self.cr2.write_volatile(cr2_val);
         }
     }
     pub fn ccr_set(&self, ccr: u32) {
         unsafe {
-            let mut ccr_val = self.CCR().read_volatile();
+            let mut ccr_val = self.ccr.read_volatile();
             ccr_val &= !(0b1111_1111_1111 << 0); // Clear CCR[11:0]
             ccr_val |= (ccr << 0);
-            self.CCR().write_volatile(ccr_val);
+            self.ccr.write_volatile(ccr_val);
         }
     }
     pub fn trise_set(&self, trise: u32) {
         unsafe {
-            let mut trise_val = self.TRISE().read_volatile();
+            let mut trise_val = self.trise.read_volatile();
             trise_val &= !(0b11111 << 0); // Clear TRISE[5:0]
             trise_val |= (trise << 0);
-            self.TRISE().write_volatile(trise_val);
+            self.trise.write_volatile(trise_val);
         }
     }
     pub fn init(&self) {
@@ -84,17 +90,17 @@ impl I2C {
     }
     pub fn cr1_start(&self) {
         unsafe {
-            let mut cr1_val = self.CR1().read_volatile();
+            let mut cr1_val = self.cr1.read_volatile();
             cr1_val |= (1 << 8); // Set the START bit (bit 8)
-            self.CR1().write_volatile(cr1_val);
-            while (self.SR1().read_volatile() & (1 << 0)) == 0 {} // Wait until the START condition is generated (SB bit is set in SR1)
+            self.cr1.write_volatile(cr1_val);
+            while (self.sr1.read_volatile() & (1 << 0)) == 0 {} // Wait until the START condition is generated (SB bit is set in SR1)
         }
     }
     pub fn cr1_stop(&self) {
         unsafe {
-            let mut cr1_val = self.CR1().read_volatile();
+            let mut cr1_val = self.cr1.read_volatile();
             cr1_val |= (1 << 9); // Set the STOP bit (bit 9)
-            self.CR1().write_volatile(cr1_val);
+            self.cr1.write_volatile(cr1_val);
         }
     }
 
@@ -105,16 +111,16 @@ pub fn dr_write(&self, address: u8, data: u8) {
     let address_write = address << 1;
     unsafe {
 
-        self.DR().write_volatile(address_write.into());
+        self.dr.write_volatile(address_write.into());
         // rprintln!("I2C address written: 0x{:X}", address_write);
 
         // Wait until the ADDR bit is set in SR1
         let mut timeout = 1000000000; // 타임아웃 카운터 설정
-        while (self.SR1().read_volatile() & (1 << 1)) == 0 {
+        while (self.sr1.read_volatile() & (1 << 1)) == 0 {
             // rprintln!("Waiting for ADDR bit to be set");
 
             // Check for errors
-            let sr1_val = self.SR1().read_volatile();
+            let sr1_val = self.sr1.read_volatile();
             if sr1_val & (1 << 8) != 0 {
                 rprintln!("I2C Bus Error");
                 break;
@@ -141,7 +147,7 @@ pub fn dr_write(&self, address: u8, data: u8) {
         }
 
         // ADDR 비트가 설정되지 않으면 함수 종료
-        if self.SR1().read_volatile() & (1 << 1) == 0 {
+        if self.sr1.read_volatile() & (1 << 1) == 0 {
             self.cr1_stop();
             return;
         }
@@ -149,20 +155,20 @@ pub fn dr_write(&self, address: u8, data: u8) {
         // rprintln!("I2C address acknowledged");
 
         // Clear ADDR flag
-        let _ = self.SR1().read_volatile();
-        let _ = self.SR2().read_volatile();
+        let _ = self.sr1.read_volatile();
+        let _ = self.sr2.read_volatile();
         // rprintln!("I2C address cleared");
 
-        self.DR().write_volatile(data.into());
+        self.dr.write_volatile(data.into());
         // rprintln!("I2C data written: 0x{:X}", data);
 
         // Wait until the BTF bit is set in SR1
         timeout = 1000000000; // 타임아웃 카운터 재설정
-        while (self.SR1().read_volatile() & (1 << 7)) == 0 {
+        while (self.sr1.read_volatile() & (1 << 7)) == 0 {
             rprintln!("Waiting for BTF bit to be set");
 
             // Check for errors
-            let sr1_val = self.SR1().read_volatile();
+            let sr1_val = self.sr1.read_volatile();
             if sr1_val & (1 << 8) != 0 {
                 rprintln!("I2C Bus Error");
                 break;
@@ -189,7 +195,7 @@ pub fn dr_write(&self, address: u8, data: u8) {
         }
 
         // BTF 비트가 설정되지 않으면 함수 종료
-        if  self.SR1().read_volatile() & (1 << 7) == 0 {
+        if  self.sr1.read_volatile() & (1 << 7) == 0 {
             self.cr1_stop();
             return;
         }
@@ -205,12 +211,12 @@ pub fn dr_write(&self, address: u8, data: u8) {
 }
 
 pub struct PCF8574_LCD {
-    i2c: I2C,
+    i2c: I2c,
     address: u8,
 }
 
 impl PCF8574_LCD {
-    pub fn new(i2c: I2C, address: u8) -> PCF8574_LCD {
+    pub fn new(i2c: I2c, address: u8) -> PCF8574_LCD {
         PCF8574_LCD {
             i2c: i2c,
             address: address,

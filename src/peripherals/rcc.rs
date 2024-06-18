@@ -273,6 +273,8 @@ impl Rcc {
             self.apb1enr.write_volatile(apb1enr_val);
         }
     }
+
+    
     pub fn apb1enr_tim_gp_en(&self, tim_gp_x: u8, enable: bool) -> Result<(), &str> {
         match tim_gp_x {
             2..=5 => {

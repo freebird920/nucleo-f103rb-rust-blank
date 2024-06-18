@@ -8,6 +8,7 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 // 모듈
 mod core_peripherals;
+
 mod peripherals;
 mod utils;
 
@@ -19,7 +20,6 @@ use crate::peripherals::exti::Exti;
 use crate::peripherals::gpio::Gpio;
 use crate::peripherals::rcc::Rcc;
 use crate::peripherals::stk::Stk;
-#[allow(unused)]
 use crate::peripherals::tim_gp::TimGp;
 
 use crate::core_peripherals::scb::Scb;
@@ -95,6 +95,13 @@ fn main() -> ! {
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
+    
+    // TIM2 세팅
+    let tim_gp = TimGp::new(2)
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("TIM2 Set")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+    
+    
     // SET AFIO
     let afio = Afio::new();
     afio.afio_clock_enable();
@@ -109,6 +116,8 @@ fn main() -> ! {
     let exti = Exti::new();
     let _ = exti.imr_set(13, true);
     exti.ftsr_set(13, true);
+    
+    
     // Nvic 세팅
     let nvic = Nvic::new(40)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Nvic Set")))
@@ -119,9 +128,10 @@ fn main() -> ! {
             nvic.iser_set(40, true);
         })
         .ok();
-    // ADC 세팅
+    
 
     
+    // ADC 세팅
     rprintln!("abp2enr: {}", rcc.abp2enr_read());
     let adc = Adc::new(1)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("ADC Set")))
@@ -131,7 +141,7 @@ fn main() -> ! {
         adc.cr2_adon(true); // ADC ON
         delay(14);
         adc.cr1_scan(true); // 스캔 모드 활성화
-        adc.cr1_eocie_set(true); // EOC 인터럽트 활성화
+        // adc.cr1_eocie_set(true); // EOC 인터럽트 활성화
 
         adc.cr2_extsel(111); // Software start
         adc.cr2_cont(true); // 연속 변환모드
@@ -156,15 +166,13 @@ fn main() -> ! {
         while !adc.sr_eoc_read() {
             // 변환 완료 대기
         }
-        let dr_read_pc0 = adc.dr_data();
-        rprintln!("ADC DR (PC0): {}", dr_read_pc0);
+        rprintln!("ADC DR (PC0): {}", adc.dr_data());
 
         // 두 번째 변환 (PC1)
         while !adc.sr_eoc_read() {
             // 변환 완료 대기
         }
-        let dr_read_pc1 = adc.dr_data();
-        rprintln!("ADC DR (PC1): {}", dr_read_pc1);
+        rprintln!("ADC DR (PC1): {}", adc.dr_data());
     });
 
     loop {
