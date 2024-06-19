@@ -155,13 +155,13 @@ impl I2c {
             let mut cr1_val = self.cr1.read_volatile();
             cr1_val |= (1 << 8); // Set the START bit (bit 8)
             self.cr1.write_volatile(cr1_val);
-            let mut count = 0;
+            // let mut count = 0;
             while (self.sr1.read_volatile() & (1 << 0)) == 0 {
-                count += 1;
-                if count > 0b1111_1110 {
-                    rprintln!("shit");
-                    break;
-                }
+                // count += 1;
+                // if count > 0b1111_1110 {
+                //     rprintln!("cr1_start Timeout waiting for SB bit to be set");
+                //     break;
+                // }
             } // Wait until the START condition is generated (SB bit is set in SR1)
         }
     }
@@ -229,15 +229,19 @@ impl I2c {
         while self.sr1_btf_read() == 0 {}
         Ok(())
     }
+
+    
     pub fn sr1_btf_read(&self) -> u8 {
         unsafe { (self.sr1.read_volatile() & (1 << 2)) as u8 }
     }
     pub fn sr1_txe_read(&self) -> u8 {
         unsafe { (self.sr1.read_volatile() & (1 << 7)) as u8 }
     }
+
     pub fn sr_btf_read(&self) -> u8 {
         unsafe { (self.sr1.read_volatile() & (1 << 2)) as u8 }
     }
+
     pub fn sr1_addr_read(&self) -> bool {
         unsafe { (self.sr1.read_volatile() & (1 << 1)) != 0 }
     }

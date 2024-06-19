@@ -1,4 +1,6 @@
-use crate::peripherals::i2c::I2c;
+use cortex_m::asm::delay;
+
+use crate::peripherals::{i2c::I2c, rcc::Rcc};
 
 pub struct Hd44780<'life_hd44780>{
     address: u8,
@@ -33,8 +35,78 @@ impl<'a>  Hd44780<'a>  {
         self.i2c.dr_send_address(self.address,)?;
         Ok(())
     }
-    pub fn send_cmd(&self, cmd: u8) -> Result<(), &'static str> {
-        self.i2c.dr_send_data(self.address , cmd)?;
+
+
+
+    pub fn send_cmd(&self, cmd: u8) {
+        let cmd_upper: u8 = (cmd & 0xF0);
+        let cmd_lower: u8 = (cmd & 0x0F) << 4;
+    
+        // rprintln!("1. cmd_upper: 0x{:X}", cmd_upper);
+    
+        self.i2c.dr_write(self.address, cmd_upper | 0b1100);
+        delay(1000 *50 );
+
+        self.i2c.dr_write(self.address, cmd_upper | 0b1000);
+        delay(1000 *50 );
+    
+        self.i2c.dr_write(self.address, cmd_lower | 0b1100);
+        delay(1000 *50 );
+
+        self.i2c.dr_write(self.address, cmd_lower | 0b1000);
+        delay(1000 *50 );
+
+    }
+    /// ## send_nibble
+    /// 4비트 모드로 데이터를 전송합니다. <br/>
+    /// - e : Enable 신호 0: Disable 1: Enable
+    /// - rw: Read/Write 신호 0: 쓰기 1: 읽기
+    /// - rs: Register Select 신호 0: 명령어 레지스터 1: 데이터 레지스터
+    pub fn send_nibble(&self, data: u8,  rw:u8, rs: u8) -> Result<(), &'static str> {
+        if(data > 0b1111) {
+            return Err("data must be 4bit");
+        }
+        if(rw > 1) {
+            return Err("rw must be 0 or 1");
+        }
+        if(rs > 1) {
+            return Err("rs must be 0 or 1");
+        }
+        let mut select_code = 0b1111 & (0b1 << 3 | 0b1<<2 | rw << 1 | rs << 0);
+        let mut nibble = (data << 4) | select_code;
+        self.i2c.dr_send_data(self.address, nibble)?;
+        
+        delay(1000 * 50);
+
+        select_code = select_code & 0b1011;
+        nibble = (data << 4) | select_code;
+
+        self.i2c.dr_send_data(self.address, nibble)?;
+        delay(1000 * 50);
         Ok(())
+    }
+    pub fn write_4bit(&self, data: u8) -> Result<(), &'static str> {
+        
+        Ok(())
+    }
+    pub fn send_data(&self, data: u8) {
+        let data_upper: u8 = (data & 0xF0);
+        let data_lower: u8 = (data & 0x0F) << 4;
+
+        // Send upper nibble
+        self.i2c.dr_write(self.address, data_upper | 0b1101); // RS = 1, EN = 1
+        delay(1000 * 50);
+        self.i2c.dr_write(self.address, data_upper | 0b1001); // RS = 1, EN = 0
+
+        // Send lower nibble
+        self.i2c.dr_write(self.address, data_lower | 0b1101); // RS = 1, EN = 1
+        delay(1000 * 50);
+        self.i2c.dr_write(self.address, data_lower | 0b1001); // RS = 1, EN = 0
+        delay(1000 * 50);
+    }
+    pub fn print(&self, str: &str) {
+        for c in str.bytes() {
+            self.send_data(c);
+        }
     }
 }
