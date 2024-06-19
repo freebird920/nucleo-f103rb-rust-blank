@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 use rtt_target::rprintln;
 
-use crate::utils::delay::{delay_sys_clk_ms, delay_sys_clk_10us};
+use crate::utils::delay::{delay_sys_clk_10us, delay_sys_clk_ms};
 
 use super::rcc::Rcc;
 
@@ -15,23 +15,21 @@ pub struct I2c {
     sr1: *mut u32,
     sr2: *mut u32,
     dr: *mut u32,
-    
 }
 
 impl I2c {
     /// ### I2c::new
     /// **I2c_x** 1 | 2
-    pub fn new(i2c_x : u8) -> Result<I2c, &'static str> {
+    pub fn new(i2c_x: u8) -> Result<I2c, &'static str> {
         let base: u32 = match i2c_x {
             1 => 0x40005400,
             2 => 0x40005800,
             _ => return Err("Invalid I2C number"),
         };
         let rcc = Rcc::new();
-        Ok(    
-        I2c { 
+        Ok(I2c {
             rcc: Rcc::new(),
-            i2c_x : i2c_x, 
+            i2c_x: i2c_x,
             cr1: (base + 0x00) as *mut u32,
             cr2: (base + 0x04) as *mut u32,
             ccr: (base + 0x1C) as *mut u32,
@@ -39,11 +37,9 @@ impl I2c {
             sr1: (base + 0x14) as *mut u32,
             sr2: (base + 0x18) as *mut u32,
             dr: (base + 0x10) as *mut u32,
-         }
-
-         )
+        })
     }
-    pub fn I2c_clock_enable(&self,){
+    pub fn i2c_clock_enable(&self,) {
         match self.i2c_x {
             1 => self.rcc.enable_i2c1(),
             2 => self.rcc.enable_i2c2(),
@@ -63,9 +59,9 @@ impl I2c {
         }
     }
 
-    pub fn cr2_freq(&self, freq: u32) {
+    pub fn cr2_freq(&self, freq: u32)-> Result<(), &'static str>{
         if (freq > 0b110010) {
-            panic!("FREQ value is out of range FREQ > 50MHz NOT ALLOWED");
+           return  Err("FREQ value is out of range FREQ > 50MHz NOT ALLOWED");
         };
         unsafe {
             self.rcc.cfgr_ppre1_set(2); // Set APB1 prescaler to 2 -> 32MHz
@@ -74,7 +70,14 @@ impl I2c {
             cr2_val |= (freq << 0); // Set FREQ[5:0] to 8MHz
             self.cr2.write_volatile(cr2_val);
         }
+        Ok(())
     }
+
+    /// ### I2c::ccr_set_std
+    /// **Important** CCR must be configured only when the I2C is disabled (PE = 0) <br/>
+    /// **ccr** CCR[11:0] bits are used to configure the SCL clock speed <br/>
+    /// **trise** TRISE[5:0] bits are used to configure the maximum rise time of SCL <br/>
+    /// trise는 자동으로 설정됨.
     pub fn ccr_set_std(&self) {
         unsafe {
             let sys_clock = self.rcc.get_sys_clock();
@@ -127,11 +130,10 @@ impl I2c {
         }
     }
 
-
     /// ### I2c::trise_set
     /// **Important** TRISE must be configured only when the I2C is disabled (PE = 0)
     /// **trise** TRISE[5:0] bits are used to configure the maximum rise time of SCL
-    pub fn trise_set(&self, trise: u32) ->Result<(), &'static str> {
+    pub fn trise_set(&self, trise: u32) -> Result<(), &'static str> {
         unsafe {
             if (trise > 0b11111) {
                 return Err("TRISE value is out of range TRISE > 31 NOT ALLOWED");
@@ -143,8 +145,6 @@ impl I2c {
             Ok(())
         }
     }
-
-
 
     pub fn cr1_start(&self) {
         unsafe {
@@ -161,111 +161,170 @@ impl I2c {
             self.cr1.write_volatile(cr1_val);
         }
     }
-
-pub fn dr_write(&self, address: u8, data: u8) {
-    self.cr1_start();
-    // rprintln!("I2C start condition set");
-
-    let address_write = address << 1;
-    unsafe {
-
-        self.dr.write_volatile(address_write.into());
-        // rprintln!("I2C address written: 0x{:X}", address_write);
-
-        // Wait until the ADDR bit is set in SR1
-        let mut timeout = 1000000000; // 타임아웃 카운터 설정
-        while (self.sr1.read_volatile() & (1 << 1)) == 0 {
-            // rprintln!("Waiting for ADDR bit to be set");
-
-            // Check for errors
-            let sr1_val = self.sr1.read_volatile();
-            if sr1_val & (1 << 8) != 0 {
-                rprintln!("I2C Bus Error");
-                break;
-            }
-            if sr1_val & (1 << 9) != 0 {
-                rprintln!("I2C Arbitration Lost");
-                break;
-            }
-            if sr1_val & (1 << 10) != 0 {
-                rprintln!("I2C Acknowledge Failure");
-                break;
-            }
-            if sr1_val & (1 << 11) != 0 {
-                rprintln!("I2C Overrun/Underrun");
-                break;
-            }
-
-            // 타임아웃 체크
-            timeout -= 1;
-            if timeout == 0 {
-                rprintln!("Timeout waiting for ADDR bit to be set");
-                break;
-            }
+    fn bit7_address_into_write(&self, address: u8) -> Result<u8, &'static str> {
+        // 7비트 주소를 읽기 모드로 설정
+        if (address) > 0b0111_1111 {
+            return Err("LSB of the address must be 0 for read mode");
         }
-
-        // ADDR 비트가 설정되지 않으면 함수 종료
-        if self.sr1.read_volatile() & (1 << 1) == 0 {
-            self.cr1_stop();
-            return;
-        }
-        
-        // rprintln!("I2C address acknowledged");
-
-        // Clear ADDR flag
-        let _ = self.sr1.read_volatile();
-        let _ = self.sr2.read_volatile();
-        // rprintln!("I2C address cleared");
-
-        self.dr.write_volatile(data.into());
-        // rprintln!("I2C data written: 0x{:X}", data);
-
-        // Wait until the BTF bit is set in SR1
-        timeout = 1000000000; // 타임아웃 카운터 재설정
-        while (self.sr1.read_volatile() & (1 << 7)) == 0 {
-            rprintln!("Waiting for BTF bit to be set");
-
-            // Check for errors
-            let sr1_val = self.sr1.read_volatile();
-            if sr1_val & (1 << 8) != 0 {
-                rprintln!("I2C Bus Error");
-                break;
-            }
-            if sr1_val & (1 << 9) != 0 {
-                rprintln!("I2C Arbitration Lost");
-                break;
-            }
-            if sr1_val & (1 << 10) != 0 {
-                rprintln!("I2C Acknowledge Failure");
-                break;
-            }
-            if sr1_val & (1 << 11) != 0 {
-                rprintln!("I2C Overrun/Underrun");
-                break;
-            }
-
-            // 타임아웃 체크
-            timeout -= 1;
-            if timeout == 0 {
-                rprintln!("Timeout waiting for BTF bit to be set");
-                break;
-            }
-        }
-
-        // BTF 비트가 설정되지 않으면 함수 종료
-        if  self.sr1.read_volatile() & (1 << 7) == 0 {
-            self.cr1_stop();
-            return;
-        }
-        
-        // rprintln!("I2C data transfer finished");
-
-        self.cr1_stop();
-        // rprintln!("I2C stop condition set");
+        Ok((address << 1))
     }
-}
+    fn bit7_address_into_read(&self, address: u8) -> Result<u8, &'static str> {
+        // 7비트 주소를 읽기 모드로 설정
+        if (address) > 0b0111_1111 {
+            return Err("LSB of the address must be 0 for read mode");
+        }
+        Ok((address << 1) | 0b0000_0001)
+    }
 
+    pub fn dr_send_address(&self, target_address: u8) -> Result<(), &'static str> {
+        // cr1 을 설정해서 보낸다.
+        self.cr1_start();
+        // let address_write = self.bit7_address_into_write(target_address)?;
+        // self.dr_set(address_write);
+        let mut count: u8 = 0;
+        // while self.sr1_addr_read() == false {
+        //     count += 1;
+        //     if count > 0b1111_1110 {
+        //         return Err("Timeout waiting for ADDR bit to be set");
+        //     }
+        //     // rprintln!("Waiting for ADDR bit to be set");
+        // }
+        // let _ = self.sr2_read();
+        Ok(())
+    }
 
+    fn i2c_send_data(&self, data: u8) -> Result<(), &'static str> {
+        // 데이터 레지스터가 비어 있는지 확인 (TXE 비트)
+        while self.sr1_txe_read() == 0 {}
+
+        // 데이터 전송
+        self.dr_set(data);
+        while self.sr1_txe_read() == 0 {}
+        while self.sr1_btf_read() == 0 {}
+        Ok(())
+    }
+    pub fn sr1_btf_read(&self) -> u8 {
+        unsafe { (self.sr1.read_volatile() & (1 << 2)) as u8 }
+    }
+    pub fn sr1_txe_read(&self) -> u8 {
+        unsafe { (self.sr1.read_volatile() & (1 << 7)) as u8 }
+    }
+    pub fn sr_btf_read(&self) -> u8 {
+        unsafe { (self.sr1.read_volatile() & (1 << 2)) as u8 }
+    }
+    pub fn sr1_addr_read(&self) -> bool {
+        unsafe { (self.sr1.read_volatile() & (1 << 1)) != 0 }
+    }
+    pub fn sr2_read(&self) -> u32 {
+        unsafe { self.sr2.read_volatile() }
+    }
+    pub fn dr_set(&self, data: u8) {
+        unsafe {
+            self.dr.write_volatile(data.into());
+        }
+    }
+
+    pub fn dr_write(&self, address: u8, data: u8) {
+        self.cr1_start();
+        // rprintln!("I2C start condition set");
+
+        let address_write = address << 1;
+        unsafe {
+            self.dr.write_volatile(address_write.into());
+            // rprintln!("I2C address written: 0x{:X}", address_write);
+
+            // Wait until the ADDR bit is set in SR1
+            let mut timeout = 1000000000; // 타임아웃 카운터 설정
+            while (self.sr1.read_volatile() & (1 << 1)) == 0 {
+                // rprintln!("Waiting for ADDR bit to be set");
+
+                // Check for errors
+                let sr1_val = self.sr1.read_volatile();
+                if sr1_val & (1 << 8) != 0 {
+                    rprintln!("I2C Bus Error");
+                    break;
+                }
+                if sr1_val & (1 << 9) != 0 {
+                    rprintln!("I2C Arbitration Lost");
+                    break;
+                }
+                if sr1_val & (1 << 10) != 0 {
+                    rprintln!("I2C Acknowledge Failure");
+                    break;
+                }
+                if sr1_val & (1 << 11) != 0 {
+                    rprintln!("I2C Overrun/Underrun");
+                    break;
+                }
+
+                // 타임아웃 체크
+                timeout -= 1;
+                if timeout == 0 {
+                    rprintln!("Timeout waiting for ADDR bit to be set");
+                    break;
+                }
+            }
+
+            // ADDR 비트가 설정되지 않으면 함수 종료
+            if self.sr1.read_volatile() & (1 << 1) == 0 {
+                self.cr1_stop();
+                return;
+            }
+
+            // rprintln!("I2C address acknowledged");
+
+            // Clear ADDR flag
+            let _ = self.sr1.read_volatile();
+            let _ = self.sr2.read_volatile();
+            // rprintln!("I2C address cleared");
+
+            self.dr.write_volatile(data.into());
+            // rprintln!("I2C data written: 0x{:X}", data);
+
+            // Wait until the BTF bit is set in SR1
+            timeout = 1000000000; // 타임아웃 카운터 재설정
+            while (self.sr1.read_volatile() & (1 << 7)) == 0 {
+                rprintln!("Waiting for BTF bit to be set");
+
+                // Check for errors
+                let sr1_val = self.sr1.read_volatile();
+                if sr1_val & (1 << 8) != 0 {
+                    rprintln!("I2C Bus Error");
+                    break;
+                }
+                if sr1_val & (1 << 9) != 0 {
+                    rprintln!("I2C Arbitration Lost");
+                    break;
+                }
+                if sr1_val & (1 << 10) != 0 {
+                    rprintln!("I2C Acknowledge Failure");
+                    break;
+                }
+                if sr1_val & (1 << 11) != 0 {
+                    rprintln!("I2C Overrun/Underrun");
+                    break;
+                }
+
+                // 타임아웃 체크
+                timeout -= 1;
+                if timeout == 0 {
+                    rprintln!("Timeout waiting for BTF bit to be set");
+                    break;
+                }
+            }
+
+            // BTF 비트가 설정되지 않으면 함수 종료
+            if self.sr1.read_volatile() & (1 << 7) == 0 {
+                self.cr1_stop();
+                return;
+            }
+
+            // rprintln!("I2C data transfer finished");
+
+            self.cr1_stop();
+            // rprintln!("I2C stop condition set");
+        }
+    }
 }
 
 pub struct PCF8574_LCD {
@@ -283,70 +342,69 @@ impl PCF8574_LCD {
     pub fn send_cmd(&self, cmd: u8) {
         let cmd_upper: u8 = (cmd & 0xF0);
         let cmd_lower: u8 = (cmd & 0x0F) << 4;
-    
+
         // rprintln!("1. cmd_upper: 0x{:X}", cmd_upper);
-    
+
         self.i2c.dr_write(self.address, cmd_upper | 0b1100);
         // rprintln!("2. cmd_upper | 0b1100 sent");
         delay_sys_clk_10us(5);
         // rprintln!("3. delay after cmd_upper | 0b1100");
-    
+
         self.i2c.dr_write(self.address, cmd_upper | 0b1000);
         // rprintln!("4. cmd_upper | 0b1000 sent");
-    
+
         self.i2c.dr_write(self.address, cmd_lower | 0b1100);
         // rprintln!("5. cmd_lower | 0b1100 sent");
         delay_sys_clk_10us(5);
         // rprintln!("6. delay after cmd_lower | 0b1100");
-    
+
         self.i2c.dr_write(self.address, cmd_lower | 0b1000);
         // rprintln!("7. cmd_lower | 0b1000 sent");
     }
 
-
     pub fn lcd_initialize(&self) {
         // 초기화 절차
-        delay_sys_clk_ms(500);             // Wait for more than 15 ms after Vcc rises to 4.5V
-        self.send_cmd(0b0011_0000);       // Function set (8-bit interface)
-        delay_sys_clk_10us(1);            // Wait for more than 4.1 ms
-        self.send_cmd(0b0011_0000);       // Function set (8-bit interface)
-        delay_sys_clk_10us(20);           // Wait for more than 100 us
-        self.send_cmd(0b0011_0000);       // Function set (8-bit interface)
+        delay_sys_clk_ms(500); // Wait for more than 15 ms after Vcc rises to 4.5V
+        self.send_cmd(0b0011_0000); // Function set (8-bit interface)
+        delay_sys_clk_10us(1); // Wait for more than 4.1 ms
+        self.send_cmd(0b0011_0000); // Function set (8-bit interface)
+        delay_sys_clk_10us(20); // Wait for more than 100 us
+        self.send_cmd(0b0011_0000); // Function set (8-bit interface)
         delay_sys_clk_10us(20);
-        self.send_cmd(0b0010_0000);       // Function set (4-bit interface)
+        self.send_cmd(0b0010_0000); // Function set (4-bit interface)
         delay_sys_clk_10us(20);
-    
+
         // Function set (4-bit interface, 2-line, 5x8 dots)
-        self.send_cmd(0b0010_1000);       // Function set (4-bit interface, 2-line display, 5x8 dots)
+        self.send_cmd(0b0010_1000); // Function set (4-bit interface, 2-line display, 5x8 dots)
         delay_sys_clk_10us(20);
-        self.send_cmd(0b0010_1000);       // Function set (4-bit interface, 2-line display, 5x8 dots)
+        self.send_cmd(0b0010_1000); // Function set (4-bit interface, 2-line display, 5x8 dots)
         delay_sys_clk_10us(200);
 
         // Display on, cursor on, blink off
-        self.send_cmd(0b0000_1110);       // Display control: Display on, cursor on, blink off
+        self.send_cmd(0b0000_1110); // Display control: Display on, cursor on, blink off
         delay_sys_clk_10us(20);
-    
+
         // Clear display
-        self.send_cmd(0b0000_0001);       // Clear display
-        delay_sys_clk_10us(200);         // This command needs a longer delay
-    
+        self.send_cmd(0b0000_0001); // Clear display
+        delay_sys_clk_10us(200); // This command needs a longer delay
+
         // Entry mode set: Increment cursor, no display shift
-        self.send_cmd(0b0000_0110);       // Entry mode set: Increment mode
+        self.send_cmd(0b0000_0110); // Entry mode set: Increment mode
         delay_sys_clk_10us(20);
 
         // self.send_cmd(0b0000_0010);
         // delay_sys_clk_10us(20);
-                // Clear display
-                // self.send_cmd(0b0000_0001);       // Clear display
-                // delay_sys_clk_10us(200);  
+        // Clear display
+        // self.send_cmd(0b0000_0001);       // Clear display
+        // delay_sys_clk_10us(200);
     }
 
     pub fn clear(&self) {
-        self.send_cmd(0b0000_0001);       // Clear display
-        delay_sys_clk_10us(200);         // This command needs a longer delay
+        self.send_cmd(0b0000_0001); // Clear display
+        delay_sys_clk_10us(200); // This command needs a longer delay
     }
     pub fn display_off(&self) {
-        self.send_cmd(0b0000_1100);       // Display off
+        self.send_cmd(0b0000_1100); // Display off
         delay_sys_clk_10us(20);
     }
     pub fn send_data(&self, data: u8) {

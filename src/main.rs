@@ -12,7 +12,6 @@ mod core_peripherals;
 mod peripherals;
 mod utils;
 
-
 // 커스텀 라이브러리
 use crate::peripherals::adc::Adc;
 use crate::peripherals::afio::Afio;
@@ -22,17 +21,15 @@ use crate::peripherals::rcc::Rcc;
 use crate::peripherals::stk::Stk;
 use crate::peripherals::tim_gp::TimGp;
 
-use crate::core_peripherals::scb::Scb;
 use crate::core_peripherals::nvic::Nvic;
+use crate::core_peripherals::scb::Scb;
 
-
-
-use panic_halt as _;
-use cortex_m_rt::{entry, exception};
 use cortex_m::{
     asm::delay,
     interrupt::{self, Mutex},
 };
+use cortex_m_rt::{entry, exception};
+use panic_halt as _;
 
 use peripherals::i2c::I2c;
 use rtt_target::{rprintln, rtt_init_print};
@@ -53,8 +50,6 @@ fn trigger_pend_sv(command: PendSVCommand) {
     // PendSV 인터럽트를 트리거
     Scb::new().icsr_pendsvset_write();
 }
-
-
 
 #[entry]
 fn main() -> ! {
@@ -95,28 +90,35 @@ fn main() -> ! {
         })
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-    
+
     // I2c 초기화
     let i2c2 = I2c::new(2)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("I2C2 Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-    let _ = i2c2.as_ref().ok().as_ref().map(|i2c| {
-        i2c.I2c_clock_enable();     // enable I2C2 clock
-        i2c.cr1_pe(false);          // disable I2C2 - 먼저 I2C2를 비활성화 한 후 설정 시작
-        i2c.cr2_freq(32);           // 32MHz 클럭 설정
-        i2c.ccr_set_std();          // 표준 모드 설정
-        i2c.cr1_pe(true);           // enable I2C2 - 설정 완료 후 I2C2 활성화
-        
-
+    let _ = i2c2.as_ref().ok().map(|i2c| {
+        i2c.i2c_clock_enable(); // enable I2C2 clock
+        i2c.cr1_pe(false); // disable I2C2 - 먼저 I2C2를 비활성화 한 후 설정 시작
+        let _ = i2c
+            .cr2_freq(32)
+            .inspect(|_| trigger_pend_sv(PendSVCommand::Log(" cr2_freq good")))
+            .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e))); // 32MHz 클럭 설정
+        i2c.ccr_set_std(); // 표준 모드 설정 + trise 설정
+        i2c.cr1_pe(true); // enable I2C2 - 설정 완료 후 I2C2 활성화
     });
 
-    
+    let _ = i2c2.as_ref().ok().and_then(|i2c| {
+        i2c.dr_send_address(0x27)
+            .map_err(|e| {
+                trigger_pend_sv(PendSVCommand::Log(e));
+                e
+            })
+            .ok()
+    });
     // TIM2 세팅
     let tim_gp = TimGp::new(2)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("TIM2 Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-    
-    
+
     // SET AFIO
     let afio = Afio::new();
     afio.afio_clock_enable();
@@ -131,8 +133,7 @@ fn main() -> ! {
     let exti = Exti::new();
     let _ = exti.imr_set(13, true);
     exti.ftsr_set(13, true);
-    
-    
+
     // Nvic 세팅
     let nvic = Nvic::new(40)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Nvic Set")))
@@ -143,9 +144,7 @@ fn main() -> ! {
             nvic.iser_set(40, true);
         })
         .ok();
-    
 
-    
     // ADC 세팅
     rprintln!("abp2enr: {}", rcc.abp2enr_read());
     let adc = Adc::new(1)
@@ -156,11 +155,10 @@ fn main() -> ! {
         adc.cr2_adon(true); // ADC ON
         delay(14);
         adc.cr1_scan(true); // 스캔 모드 활성화
-        // adc.cr1_eocie_set(true); // EOC 인터럽트 활성화
+                            // adc.cr1_eocie_set(true); // EOC 인터럽트 활성화
 
         adc.cr2_extsel(111); // Software start
         adc.cr2_cont(true); // 연속 변환모드
-
 
         adc.cr2_cal(); // 보정
         rprintln!("cr1_read {}", adc.cr1_read());
@@ -209,7 +207,7 @@ unsafe fn DefaultHandler(irqn: i16) {
             let adc = Adc::new(1);
             let dr_read = adc.as_ref().map(|adc| adc.dr_data());
             rprintln!("ADC DR: {}", dr_read.unwrap_or(0));
-        },
+        }
         40 => {
             rprintln!("EXTI15_10");
             let exti = Exti::new();
@@ -217,13 +215,13 @@ unsafe fn DefaultHandler(irqn: i16) {
             rprintln!("PR: {}", pr);
             exti.pr_clear(13);
         }
-        _ => { ()
+        _ => {
+            ()
             // let exti = Exti::new();
             // exti.pr_clear(irqn as u8)
-        },
+        }
     }
 }
-
 
 #[exception]
 fn PendSV() {
@@ -231,7 +229,6 @@ fn PendSV() {
         if let Some(command) = PENDSV_COMMAND.borrow(cs).take() {
             match command {
                 PendSVCommand::Log(message) => rprintln!("{}", message),
-                
             }
         }
     });
