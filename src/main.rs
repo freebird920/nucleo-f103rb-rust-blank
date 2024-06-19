@@ -25,12 +25,13 @@ use crate::peripherals::stk::Stk;
 use crate::peripherals::tim_gp::TimGp;
 
 use crate::external::pcf8574::Pcf8574;
-
+use crate::external::hd44780::Hd44780;
 use cortex_m::{
     asm::delay,
     interrupt::{self, Mutex},
 };
 use cortex_m_rt::{entry, exception};
+use external::hd44780;
 use panic_halt as _;
 
 use peripherals::i2c::I2c;
@@ -197,8 +198,64 @@ fn main() -> ! {
     });
     // send adta
     let _ = i2c2.as_ref().map(|i2c| {
-        let _ = i2c.dr_send_address(0b100111).inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-        let _ = i2c.dr_send_data(0b100111, 0b00000000).inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+        let hd44780_address: u8 = 0b100111;
+        let hd44780 = Hd44780::new(hd44780_address, i2c); 
+        let _ = hd44780.send_address();
+        delay(32 * 1000 * 1000);
+        rprintln!("1");
+    
+        let _ = hd44780.send_cmd(0b1100_0010);
+        delay(32 * 1000 * 1000);
+        rprintln!("2");
+    
+        let _ = hd44780.send_cmd(0b0010_1000);
+        delay(32 * 1000 * 1000);
+        rprintln!("3");
+    
+        let _ = hd44780.send_cmd(0b1000_1100);
+        delay(32 * 1000 * 1000);
+        rprintln!("4");
+    
+        let _ = hd44780.send_cmd(0b1000_1000);
+        delay(32 * 1000 * 1000);
+        rprintln!("5");
+    
+        let _ = hd44780.send_cmd(0b0000_1100);
+        delay(32 * 1000 * 1000);
+        rprintln!("6");
+    
+        let _ = hd44780.send_cmd(0b0000_1000);
+        delay(32 * 1000 * 1000);
+        rprintln!("7");
+    
+        let _ = hd44780.send_cmd(0b0001_1100);
+        delay(32 * 1000 * 1000);
+        rprintln!("8");
+    
+        let _ = hd44780.send_cmd(0b0001_1000);
+        delay(32 * 1000 * 1000);
+        delay(32 * 1000 * 1000);
+        rprintln!("9");
+    
+        let _ = hd44780.send_cmd(0b01001000); // 'H'
+        delay(32 * 1000 * 1000);
+        rprintln!("10");
+    
+        let _ = hd44780.send_cmd(0b01000101); // 'E'
+        delay(32 * 1000 * 1000);
+        rprintln!("11");
+    
+        let _ = hd44780.send_cmd(0b01001100); // 'L'
+        delay(32 * 1000 * 1000);
+        rprintln!("12");
+    
+        let _ = hd44780.send_cmd(0b01001100); // 'L'
+        delay(32 * 1000 * 1000);
+        rprintln!("13");
+    
+        let _ = hd44780.send_cmd(0b01001111); // 'O'
+        delay(32 * 1000 * 1000);
+        rprintln!("14");
     });
 
     loop {
