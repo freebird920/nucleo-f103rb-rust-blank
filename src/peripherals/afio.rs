@@ -30,7 +30,7 @@ impl Afio {
     }
     pub fn afio_clock_enable(&self) {
         // RCC_APB2ENR
-        Rcc::new().abp2enr_afioen(true);
+        Rcc::new().apb2enr_afioen(true);
     }
 
     /// ### EXTIx Configuration Register

@@ -39,12 +39,10 @@ impl I2c {
             dr: (base + 0x10) as *mut u32,
         })
     }
-    pub fn i2c_clock_enable(&self,) {
-        match self.i2c_x {
-            1 => self.rcc.enable_i2c1(),
-            2 => self.rcc.enable_i2c2(),
-            _ => (),
-        }
+    pub fn i2c_clock_enable(&self) {
+        let rcc = Rcc::new();
+        rcc.enable_i2c2(); // I2C1 clock enable
+        rprintln!("abp1enr: {}", rcc.apb1enr_read());
     }
 
     pub fn cr1_pe(&self, enable: bool) {
@@ -59,12 +57,12 @@ impl I2c {
         }
     }
 
-    pub fn cr2_freq(&self, freq: u32)-> Result<(), &'static str>{
+    pub fn cr2_freq(&self, freq: u32) -> Result<(), &'static str> {
         if (freq > 0b110010) {
-           return  Err("FREQ value is out of range FREQ > 50MHz NOT ALLOWED");
+            return Err("FREQ value is out of range FREQ > 50MHz NOT ALLOWED");
         };
         unsafe {
-            self.rcc.cfgr_ppre1_set(2); // Set APB1 prescaler to 2 -> 32MHz
+            self.rcc.cfgr_ppre1_set(8); // Set APB1 prescaler to 2 -> 32MHz
             let mut cr2_val = self.cr2.read_volatile();
             cr2_val &= !(0b111111 << 0); // Clear FREQ[5:0]
             cr2_val |= (freq << 0); // Set FREQ[5:0] to 8MHz
@@ -81,9 +79,10 @@ impl I2c {
     pub fn ccr_set_std(&self) {
         unsafe {
             let sys_clock = self.rcc.get_sys_clock();
+            // rprintln!("sys_clock: {}", sys_clock);
             let ppre1_val = self.rcc.cfgr_ppre1_read();
             let apb1_clock = sys_clock / ppre1_val;
-
+            // rprintln!("apb1_clock: {}", apb1_clock);
             // 표준 모드에서 100kHz 설정
             let i2c_clock = 100_000;
             let ccr = (apb1_clock / (i2c_clock * 2)) as u32;
@@ -92,10 +91,12 @@ impl I2c {
             let mut ccr_val = self.ccr.read_volatile();
             ccr_val &= !(0b1111_1111_1111 << 0); // Clear CCR[11:0]
             ccr_val |= (ccr & 0b1111_1111_1111); // Set CCR[11:0]
+            rprintln!("ccr_val: 0b{:b}", ccr_val);
             self.ccr.write_volatile(ccr_val);
 
             // TRISE 설정
             let trise = (apb1_clock / 1_000_000) + 1; // 표준 모드 (1000ns / T_PCLK1) + 1
+            rprintln!("trise: {}", trise);
             self.trise.write_volatile(trise as u32);
         }
     }
@@ -151,7 +152,14 @@ impl I2c {
             let mut cr1_val = self.cr1.read_volatile();
             cr1_val |= (1 << 8); // Set the START bit (bit 8)
             self.cr1.write_volatile(cr1_val);
-            while (self.sr1.read_volatile() & (1 << 0)) == 0 {} // Wait until the START condition is generated (SB bit is set in SR1)
+            let mut count = 0;
+            while (self.sr1.read_volatile() & (1 << 0)) == 0 {
+                count += 1;
+                if count > 0b1111_1110 {
+                    rprintln!("shit");
+                    break;
+                }
+            } // Wait until the START condition is generated (SB bit is set in SR1)
         }
     }
     pub fn cr1_stop(&self) {
@@ -179,17 +187,16 @@ impl I2c {
     pub fn dr_send_address(&self, target_address: u8) -> Result<(), &'static str> {
         // cr1 을 설정해서 보낸다.
         self.cr1_start();
-        // let address_write = self.bit7_address_into_write(target_address)?;
-        // self.dr_set(address_write);
+        let address_write = self.bit7_address_into_write(target_address)?;
+        self.dr_set(address_write);
         let mut count: u8 = 0;
-        // while self.sr1_addr_read() == false {
-        //     count += 1;
-        //     if count > 0b1111_1110 {
-        //         return Err("Timeout waiting for ADDR bit to be set");
-        //     }
-        //     // rprintln!("Waiting for ADDR bit to be set");
-        // }
-        // let _ = self.sr2_read();
+        while self.sr1_addr_read() == false {
+            count += 1;
+            if count > 0b1111_1110 {
+                return Err("Timeout waiting for ADDR bit to be set");
+            }
+        }
+        let _ = self.sr2_read();
         Ok(())
     }
 

@@ -10,7 +10,6 @@ pub struct Rcc {
     cr: *mut u32,
     cfgr: *mut u32,
     apb2enr: *mut u32,
-    #[allow(unused)]
     apb1enr: *mut u32,
     // ahbenr: *mut u32,
     // bdcr: *mut u32,
@@ -32,9 +31,11 @@ impl Rcc {
         }
     }
 
-    #[allow(unused)]
     pub fn apb2enr_read(&self) -> u32 {
         unsafe { self.apb2enr.read_volatile() }
+    }
+    pub fn apb1enr_read(&self) -> u32 {
+        unsafe { self.apb1enr.read_volatile() }
     }
 
 
@@ -49,21 +50,9 @@ impl Rcc {
         }
     }
 
-    #[allow(unused)]
-    pub fn read_cr_pllrdy(&self) -> bool {
-        unsafe {
-            let rcc_cr_val = self.cr.read_volatile();
-            rcc_cr_val & (1 << 25) != 0
-        }
-    }
 
-    pub fn read_cfgr(&self) -> u32 {
+    pub fn cfgr_read(&self) -> u32 {
         unsafe { self.cfgr.read_volatile() }
-    }
-
-    #[allow(unused)]
-    pub fn read_cr(&self) -> u32 {
-        unsafe { self.cr.read_volatile() }
     }
 
     /// ### set_sys_clock - Set system clock
@@ -248,11 +237,7 @@ impl Rcc {
         }
     }
 
-
-    pub fn abp2enr_read(&self) -> u32 {
-        unsafe { self.apb2enr.read_volatile() }
-    } 
-    pub fn abp2enr_afioen(&self, enable: bool) {
+    pub fn apb2enr_afioen(&self, enable: bool) {
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();
             if enable {
@@ -350,7 +335,7 @@ impl Rcc {
 
     pub fn get_sys_clock(&self) -> u32 {
         // RCC 레지스터 하드코딩된 값
-        let rcc_cfgr = self.read_cfgr(); // 예시 값, 실제 값으로 교체 필요
+        let rcc_cfgr = self.cfgr_read(); // 예시 값, 실제 값으로 교체 필요
 
         // HSI 클럭 속도
         let hsi_clk = 8_000_000; // 8 MHz

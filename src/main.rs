@@ -78,6 +78,17 @@ fn main() -> ! {
         })
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio A Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+    // GPIO B 초기화
+    let gpio_b = Gpio::new(1)
+        .and_then(|gpio_b| {
+            gpio_b.gpio_clock_enable()?;
+            gpio_b.cr_pin_config(10, 0b1001)?; // CNFy + MODEx
+            gpio_b.cr_pin_config(11, 0b1010)?; // CNFy + MODEx
+
+            Ok(gpio_b)
+        })
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio B Init")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
     // GPIO C 초기화
     let _ = Gpio::new(2)
@@ -90,30 +101,7 @@ fn main() -> ! {
         })
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-
-    // I2c 초기화
-    let i2c2 = I2c::new(2)
-        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("I2C2 Init")))
-        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-    let _ = i2c2.as_ref().ok().map(|i2c| {
-        i2c.i2c_clock_enable(); // enable I2C2 clock
-        i2c.cr1_pe(false); // disable I2C2 - 먼저 I2C2를 비활성화 한 후 설정 시작
-        let _ = i2c
-            .cr2_freq(32)
-            .inspect(|_| trigger_pend_sv(PendSVCommand::Log(" cr2_freq good")))
-            .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e))); // 32MHz 클럭 설정
-        i2c.ccr_set_std(); // 표준 모드 설정 + trise 설정
-        i2c.cr1_pe(true); // enable I2C2 - 설정 완료 후 I2C2 활성화
-    });
-
-    let _ = i2c2.as_ref().ok().and_then(|i2c| {
-        i2c.dr_send_address(0x27)
-            .map_err(|e| {
-                trigger_pend_sv(PendSVCommand::Log(e));
-                e
-            })
-            .ok()
-    });
+    rprintln!("abp2enr: {}", rcc.apb2enr_read());
     // TIM2 세팅
     let tim_gp = TimGp::new(2)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("TIM2 Set")))
@@ -122,7 +110,7 @@ fn main() -> ! {
     // SET AFIO
     let afio = Afio::new();
     afio.afio_clock_enable();
-    rprintln!("ABP2ENR: {}", rcc.abp2enr_read());
+    rprintln!("ABP2ENR: {}", rcc.apb2enr_read());
     let _ = afio
         .exti_cr(2, 13)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("AFIO Port-C Pin-13 Set")))
@@ -146,7 +134,8 @@ fn main() -> ! {
         .ok();
 
     // ADC 세팅
-    rprintln!("abp2enr: {}", rcc.abp2enr_read());
+    rprintln!("abp2enr: {}", rcc.apb2enr_read());
+
     let adc = Adc::new(1)
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("ADC Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
@@ -186,6 +175,33 @@ fn main() -> ! {
             // 변환 완료 대기
         }
         rprintln!("ADC DR (PC1): {}", adc.dr_data());
+    });
+    rprintln!("abp1enr: {}", rcc.apb1enr_read());
+    // I2c 초기화
+    let i2c2 = I2c::new(2)
+        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("I2C2 Init")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+    let _ = i2c2.as_ref().ok().map(|i2c| {
+        rprintln!("abp1enr: {}", rcc.apb1enr_read());
+
+        i2c.i2c_clock_enable(); // enable I2C2 clock
+        i2c.cr1_pe(false); // disable I2C2 - 먼저 I2C2를 비활성화 한 후 설정 시작
+        let _ = i2c
+            .cr2_freq(8)
+            .inspect(|_| trigger_pend_sv(PendSVCommand::Log(" cr2_freq good")))
+            .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e))); // 32MHz 클럭 설정
+        i2c.ccr_set_std(); // 표준 모드 설정 + trise 설정
+        i2c.cr1_pe(true); // enable I2C2 - 설정 완료 후 I2C2 활성화
+    });
+
+    let _ = i2c2.as_ref().ok().and_then(|i2c| {
+        i2c.dr_send_address(0b100111)
+            .map_err(|e| {
+                trigger_pend_sv(PendSVCommand::Log(e));
+                e
+            })
+        
+            .ok()
     });
 
     loop {
