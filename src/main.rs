@@ -8,11 +8,14 @@ use core::sync::atomic::{AtomicU32, Ordering};
 
 // 모듈
 mod core_peripherals;
-
+mod external;
 mod peripherals;
 mod utils;
 
 // 커스텀 라이브러리
+use crate::core_peripherals::nvic::Nvic;
+use crate::core_peripherals::scb::Scb;
+
 use crate::peripherals::adc::Adc;
 use crate::peripherals::afio::Afio;
 use crate::peripherals::exti::Exti;
@@ -21,8 +24,7 @@ use crate::peripherals::rcc::Rcc;
 use crate::peripherals::stk::Stk;
 use crate::peripherals::tim_gp::TimGp;
 
-use crate::core_peripherals::nvic::Nvic;
-use crate::core_peripherals::scb::Scb;
+use crate::external::pcf8574::Pcf8574;
 
 use cortex_m::{
     asm::delay,
@@ -193,15 +195,10 @@ fn main() -> ! {
         i2c.ccr_set_std(); // 표준 모드 설정 + trise 설정
         i2c.cr1_pe(true); // enable I2C2 - 설정 완료 후 I2C2 활성화
     });
-
-    let _ = i2c2.as_ref().ok().and_then(|i2c| {
-        i2c.dr_send_address(0b100111)
-            .map_err(|e| {
-                trigger_pend_sv(PendSVCommand::Log(e));
-                e
-            })
-        
-            .ok()
+    // send adta
+    let _ = i2c2.as_ref().map(|i2c| {
+        let _ = i2c.dr_send_address(0b100111).inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+        let _ = i2c.dr_send_data(0b100111, 0b00000000).inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
     });
 
     loop {

@@ -39,10 +39,13 @@ impl I2c {
             dr: (base + 0x10) as *mut u32,
         })
     }
-    pub fn i2c_clock_enable(&self) {
-        let rcc = Rcc::new();
-        rcc.enable_i2c2(); // I2C1 clock enable
-        rprintln!("abp1enr: {}", rcc.apb1enr_read());
+    pub fn i2c_clock_enable(&self, ) {
+        match self.i2c_x {
+            1 => self.rcc.enable_i2c1(), // I2C1 clock enable
+            2 => self.rcc.enable_i2c2(),
+            _ => panic!("Invalid I2C number"),
+        } // I2C1 clock enable
+        rprintln!("abp1enr: {}", self.rcc.apb1enr_read());
     }
 
     pub fn cr1_pe(&self, enable: bool) {
@@ -134,18 +137,18 @@ impl I2c {
     /// ### I2c::trise_set
     /// **Important** TRISE must be configured only when the I2C is disabled (PE = 0)
     /// **trise** TRISE[5:0] bits are used to configure the maximum rise time of SCL
-    pub fn trise_set(&self, trise: u32) -> Result<(), &'static str> {
-        unsafe {
-            if (trise > 0b11111) {
-                return Err("TRISE value is out of range TRISE > 31 NOT ALLOWED");
-            };
-            let mut trise_val = self.trise.read_volatile();
-            trise_val &= !(0b11111 << 0); // Clear TRISE[5:0]
-            trise_val |= (trise << 0);
-            self.trise.write_volatile(trise_val);
-            Ok(())
-        }
-    }
+    // pub fn trise_set(&self, trise: u32) -> Result<(), &'static str> {
+    //     unsafe {
+    //         if (trise > 0b11111) {
+    //             return Err("TRISE value is out of range TRISE > 31 NOT ALLOWED");
+    //         };
+    //         let mut trise_val = self.trise.read_volatile();
+    //         trise_val &= !(0b11111 << 0); // Clear TRISE[5:0]
+    //         trise_val |= (trise << 0);
+    //         self.trise.write_volatile(trise_val);
+    //         Ok(())
+    //     }
+    // }
 
     pub fn cr1_start(&self) {
         unsafe {
@@ -199,8 +202,24 @@ impl I2c {
         let _ = self.sr2_read();
         Ok(())
     }
+    pub fn dr_send_data(&self, target_address: u8, data: u8) -> Result<(), &'static str> {
+        // cr1 을 설정해서 보낸다.
+        self.cr1_start();
+        let address_write = self.bit7_address_into_write(target_address)?;
+        self.dr_set(address_write);
+        let mut count: u8 = 0;
+        while self.sr1_addr_read() == false {
+            count += 1;
+            if count > 0b1111_1110 {
+                return Err("Timeout waiting for ADDR bit to be set");
+            }
+        }
+        let _ = self.sr2_read();
+        self.dr_set(data);
+        Ok(())
 
-    fn i2c_send_data(&self, data: u8) -> Result<(), &'static str> {
+    }
+    pub fn i2c_send_data(&self, data: u8) -> Result<(), &'static str> {
         // 데이터 레지스터가 비어 있는지 확인 (TXE 비트)
         while self.sr1_txe_read() == 0 {}
 
