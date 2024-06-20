@@ -7,3 +7,4 @@ pub mod i2c;
 pub mod rcc;
 pub mod stk;
 pub mod tim_gp;
+pub mod usart;
