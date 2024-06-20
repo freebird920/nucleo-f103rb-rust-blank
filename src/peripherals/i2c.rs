@@ -39,6 +39,43 @@ impl I2c {
             dr: (base + 0x10) as *mut u32,
         })
     }
+    pub fn write_byte(&self, target_address: u8, data: u8) -> Result<(), &'static str> {
+        // Generate START condition
+        self.cr1_start();
+
+        // Send address with write bit
+        let address_write = self.bit7_address_into_write(target_address)?;
+        self.dr_set(address_write);
+
+        // Wait for ADDR bit to be set
+        while !self.sr1_addr_read() {}
+        let _ = self.sr2_read(); // Clear ADDR flag
+
+        // Send data
+        self.dr_set(data);
+
+        // Wait for TXE and BTF bits to be set
+        while !self.sr1_txe_read() == 0 {}
+        while !self.sr1_btf_read() == 0 {}
+
+        // Generate STOP condition
+        self.cr1_stop();
+
+        Ok(())
+    }
+    pub fn read_byte(&self, target_address: u8) -> Result<u8, &'static str> {
+        self.cr1_start();
+        let address_read = self.bit7_address_into_read(target_address)?;
+        self.dr_set(address_read);
+        while self.sr1_addr_read() == false {}
+        let _ = self.sr2_read();
+        while self.sr1_rxne_read() == false {}
+        let data = self.dr_read();
+        self.cr1_stop();
+        Ok(data)
+    }
+
+
     pub fn i2c_clock_enable(&self, ) {
         match self.i2c_x {
             1 => self.rcc.enable_i2c1(), // I2C1 clock enable
@@ -55,6 +92,18 @@ impl I2c {
                 cr1_val |= (1 << 0); // Enable I2C
             } else {
                 cr1_val &= !(1 << 0); // Disable I2C
+            }
+            self.cr1.write_volatile(cr1_val);
+        }
+    }
+
+    pub fn cr1_ack(&self, enable: bool) {
+        unsafe {
+            let mut cr1_val = self.cr1.read_volatile();
+            if enable {
+                cr1_val |= (1 << 10); // Enable I2C
+            } else {
+                cr1_val &= !(1 << 10); // Disable I2C
             }
             self.cr1.write_volatile(cr1_val);
         }
@@ -180,10 +229,11 @@ impl I2c {
         Ok((address << 1))
     }
     fn bit7_address_into_read(&self, address: u8) -> Result<u8, &'static str> {
-        // 7비트 주소를 읽기 모드로 설정
-        if (address) > 0b0111_1111 {
-            return Err("LSB of the address must be 0 for read mode");
+        // 주소가 7비트 범위 내에 있는지 확인
+        if address > 0b0111_1111 {
+            return Err("Address must be 7 bits");
         }
+        // 읽기 모드로 변환
         Ok((address << 1) | 0b0000_0001)
     }
 
@@ -230,7 +280,39 @@ impl I2c {
         Ok(())
     }
 
-    
+    pub fn master_read(&self, target_address: u8, buffer: &mut [u8]) -> Result<(), &'static str> {
+        let len = buffer.len();
+        if len == 0 {
+            return Err("Buffer length must be greater than zero");
+        }
+
+        // 1. Generate START condition
+        self.cr1_start();
+
+        // 2. Send address with read bit
+        let address_read = self.bit7_address_into_read(target_address)?;
+        self.dr_set(address_read);
+
+        // 3. Wait for ADDR bit to be set
+        while self.sr1_addr_read() == false {}
+        let _ = self.sr2_read(); // Clear ADDR flag
+
+        for i in 0..len {
+            // If only one byte to read
+            if i == len - 1 {
+                self.cr1_ack(false); // Disable ACK for the last byte
+                self.cr1_stop(); // Generate STOP condition
+            }
+
+            // Wait until the RXNE bit is set
+            while self.sr1_rxne_read() {}
+
+            // Read data from DR
+            buffer[i] = self.dr_read();
+        }
+
+        Ok(())
+    }
     pub fn sr1_btf_read(&self) -> u8 {
         unsafe { (self.sr1.read_volatile() & (1 << 2)) as u8 }
     }
@@ -245,6 +327,9 @@ impl I2c {
     pub fn sr1_addr_read(&self) -> bool {
         unsafe { (self.sr1.read_volatile() & (1 << 1)) != 0 }
     }
+    fn sr1_rxne_read(&self) -> bool {
+        unsafe { (self.sr1.read_volatile() & (1 << 6)) != 0 }
+    }
     pub fn sr2_read(&self) -> u32 {
         unsafe { self.sr2.read_volatile() }
     }
@@ -253,7 +338,9 @@ impl I2c {
             self.dr.write_volatile(data.into());
         }
     }
-
+    fn dr_read(&self) -> u8 {
+        unsafe { self.dr.read_volatile() as u8 }
+    }
     pub fn dr_write(&self, address: u8, data: u8) {
         self.cr1_start();
         // rprintln!("I2C start condition set");

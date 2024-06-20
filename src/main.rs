@@ -202,13 +202,15 @@ fn main() -> ! {
         let hd44780_address: u8 = 0b100111;
         let hd44780 = Hd44780::new(hd44780_address, i2c);
         let _ = hd44780.send_address();
-        delay(64 * 1000 * 1000);
+        delay(64 * 1000 * 50);
 
         // 초기화 명령어 전송
         let _ = hd44780.send_cmd(0b0011_0000);
         let _ = hd44780.send_cmd(0b0011_0000);
         let _ = hd44780.send_cmd(0b0011_0000);
         let _ = hd44780.send_cmd(0b0010_0000);
+
+
 
         let _ = hd44780.send_cmd(0b0010_1000);
         let _ = hd44780.send_cmd(0b0010_1000);
