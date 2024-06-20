@@ -45,7 +45,16 @@ impl Rcc {
 
 // ## CR
 impl Rcc {
-    /// ## CR_HSION -  HSI ON
+
+    /// ## CR[24] PLLON CR[25] PLLRDY -  PLL ON
+    pub fn cr_pllon(&self) {
+        let mut rcc_cr_val = self.read_reg(self.cr);
+        rcc_cr_val |= (1 << 24); // Enable PLL
+        self.write_reg(self.cr, rcc_cr_val);
+        while self.read_reg(self.cr) & (1 << 25) == 0 {} // Wait until PLL is ready
+    }
+
+    /// ## CR[0] HSION -  HSI ON
     /// HSI oscillator enabled
     pub fn cr_hsion(&self) {
         unsafe {
@@ -59,8 +68,66 @@ impl Rcc {
 
 // ## CFGR
 impl Rcc {
-    pub fn cfgr_read(&self) -> u32 {
-        unsafe { self.cfgr.read_volatile() }
+    /// ### CFGR[21:18] PLLMUL - PLL multiplication factor
+    /// **IMPORTANT** PLL output freq muts not exceed 72MHz
+    /// - 0000: PLL input clock x 2
+    /// - 0001: PLL input clock x 3
+    /// - 0010: PLL input clock x 4
+    /// - 0011: PLL input clock x 5
+    /// - 0100: PLL input clock x 6
+    /// - 0101: PLL input clock x 7
+    /// - 0110: PLL input clock x 8
+    /// - 0111: PLL input clock x 9
+    /// - 1000: PLL input clock x 10
+    /// - 1001: PLL input clock x 11
+    /// - 1010: PLL input clock x 12
+    /// - 1011: PLL input clock x 13
+    /// - 1100: PLL input clock x 14
+    /// - 1101: PLL input clock x 15
+    /// - 1110: PLL input clock x 16
+    /// - 1111: PLL input clock x 16
+    pub fn cfgr_pllmul_set(&self, multiplication_factor: u32) -> Result<(), &'static str> {
+        if (multiplication_factor > 0b1111) {
+            return Err("invalid multiplication_factor");
+        };
+
+        let mut rcc_cfgr_val = self.read_reg(self.cfgr);
+        rcc_cfgr_val &= !(0b1111 << 18); // Clear PLLMUL bits
+        rcc_cfgr_val |= (multiplication_factor << 18); // Set PLLMUL bits
+        self.write_reg(self.cfgr, rcc_cfgr_val);
+        Ok(())
+    }
+
+    /// ### CFGR[16] PLLSRC - PLL entry clock source
+    /// - 0: HSI/2 selected as PLL input clock
+    /// - 1: HSE selected as PLL input clock
+    pub fn cfgr_pllsrc_set(&self, pllsrc: u32) -> Result<(), &'static str> {
+        let mut rcc_cfgr_val = self.read_reg(self.cfgr);
+        match pllsrc {
+            0 => rcc_cfgr_val &= !(0b1 << 16),   // Clear PLLSRC bit
+            1 => rcc_cfgr_val |= (pllsrc << 16), // Set PLLSRC bit
+            _ => return Err("invalid pllsrc"),
+        };
+        self.write_reg(self.cfgr, rcc_cfgr_val);
+        Ok(())
+    }
+    /// ### CFGR[0] SW - System clock switch
+    /// - 00: HSI selected as system clock
+    /// - 01: HSE selected as system clock
+    /// - 10: PLL selected as system clock
+    /// - 11: not allowed
+    ///
+    pub fn cfgr_sw_set(&self, sw: u32) -> Result<(), &'static str> {
+        let mut rcc_cfgr_val = self.read_reg(self.cfgr);
+        rcc_cfgr_val &= !(0b11 << 0); // Clear SW bits
+        match sw {
+            0 => (),
+            1 => rcc_cfgr_val |= (sw << 0),
+            2 => rcc_cfgr_val |= (sw << 0), // Set SW bits
+            _ => return Err("invalid sw"),
+        };
+        self.write_reg(self.cfgr, rcc_cfgr_val);
+        Ok(())
     }
 }
 
