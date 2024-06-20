@@ -31,15 +31,34 @@ impl Rcc {
         }
     }
 
-    /// ## apb2enr_iop_x_en_set
+    /// ## CR_HSION -  HSI ON
+    /// HSI oscillator enabled
+    pub fn cr_hsion(&self) {
+        unsafe {
+            let mut rcc_cr_val = self.cr.read_volatile();
+            rcc_cr_val |= (1 << 0); // Enable HSI
+            self.cr.write_volatile(rcc_cr_val);
+            while self.cr.read_volatile() & (1 << 1) == 0 {} // Wait until HSI is ready
+        }
+    }
+
+
+}
+
+impl Rcc{
+        /// ## apb2enr_iop_x_en_set
     /// iop_x_en bit set in APB2ENR register <br/>s
     /// ### @params
     /// - iop_x: u8 (0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H)
     /// - val: u32 (0: disable, 1: enable)
-    pub fn apb2enr_iop_x_en_set(&self, iop_x:u8, val:u32)-> Result<(), &'static str>{
-        if val > 1 {return Err("invalid val. val: 0 | 1")};
-        if iop_x > 7 {return Err("invalid iop_x. iop_x: 0 ~ 7")};
-        let shift = iop_x +2;
+    pub fn apb2enr_iop_x_en_set(&self, iop_x: u8, val: u32) -> Result<(), &'static str> {
+        if val > 1 {
+            return Err("invalid val. val: 0 | 1");
+        };
+        if iop_x > 7 {
+            return Err("invalid iop_x. iop_x: 0 ~ 7");
+        };
+        let shift = iop_x + 2;
         unsafe {
             let mut apb2enr_val = self.apb2enr.read_volatile();
             apb2enr_val = apb2enr_val | (val << shift);
