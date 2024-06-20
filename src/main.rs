@@ -7,6 +7,9 @@ use core::cell::RefCell;
 use core::sync::atomic::{AtomicU32, Ordering};
 
 // 모듈
+mod applications;
+mod registers;
+
 mod core_peripherals;
 mod external;
 mod peripherals;
@@ -36,6 +39,9 @@ use panic_halt as _;
 
 use peripherals::i2c::I2c;
 use rtt_target::{rprintln, rtt_init_print};
+
+use crate::applications::peripherals::rcc::UseRcc;
+use crate::registers::peripherals::rcc::Rcc as RegistersRcc;
 
 static SYS_CLOCK: AtomicU32 = AtomicU32::new(0);
 static PENDSV_COMMAND: Mutex<RefCell<Option<PendSVCommand>>> = Mutex::new(RefCell::new(None));
@@ -71,11 +77,16 @@ fn main() -> ! {
     );
 
     rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire));
-
+    let register_rcc = RegistersRcc::new();
+    let use_rcc = UseRcc::new(&register_rcc);
+    let _ = use_rcc
+        .abp2enr_iop_x_en_set(0, 1)
+        .inspect(|()| trigger_pend_sv(PendSVCommand::Log("GIOP A Enable")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
     // GPIO A 초기화
     let gpio_a = Gpio::new(0)
         .and_then(|gpio_a| {
-            gpio_a.gpio_clock_enable()?;
+            // gpio_a.gpio_clock_enable()?;
             gpio_a.cr_pin_config(5, 0b0001)?; // CNFy + MODEx
             Ok(gpio_a)
         })
@@ -135,7 +146,6 @@ fn main() -> ! {
             nvic.iser_set(40, true);
         })
         .ok();
-
 
     loop {
         // rprintln!("Loop");
