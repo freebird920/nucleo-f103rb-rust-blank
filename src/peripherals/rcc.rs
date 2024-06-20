@@ -16,7 +16,7 @@ pub struct Rcc {
     // csr: *mut u32,
 }
 
-impl Rcc {
+impl Rcc { // new()
     pub fn new() -> Rcc {
         // let base_addr = RCC_BASE;
         Rcc {

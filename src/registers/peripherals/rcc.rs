@@ -16,6 +16,7 @@ pub struct Rcc {
 }
 
 impl Rcc {
+    // new()
     pub fn new() -> Rcc {
         Rcc {
             cr: (RCC_BASE + 0x00) as *mut u32,
@@ -30,7 +31,20 @@ impl Rcc {
             csr: (RCC_BASE + 0x24) as *mut u32,
         }
     }
+}
 
+impl Rcc {
+    fn read_reg(&self, reg: *mut u32) -> u32 {
+        unsafe { core::ptr::read_volatile(reg) }
+    }
+
+    fn write_reg(&self, reg: *mut u32, val: u32) {
+        unsafe { core::ptr::write_volatile(reg, val) }
+    }
+}
+
+// ## CR
+impl Rcc {
     /// ## CR_HSION -  HSI ON
     /// HSI oscillator enabled
     pub fn cr_hsion(&self) {
@@ -41,12 +55,19 @@ impl Rcc {
             while self.cr.read_volatile() & (1 << 1) == 0 {} // Wait until HSI is ready
         }
     }
-
-
 }
 
-impl Rcc{
-        /// ## apb2enr_iop_x_en_set
+// ## CFGR
+impl Rcc {
+    pub fn cfgr_read(&self) -> u32 {
+        unsafe { self.cfgr.read_volatile() }
+    }
+}
+
+// ## APB2ENR
+impl Rcc {
+    // apb2enr
+    /// ## apb2enr_iop_x_en_set
     /// iop_x_en bit set in APB2ENR register <br/>s
     /// ### @params
     /// - iop_x: u8 (0: A, 1: B, 2: C, 3: D, 4: E, 5: F, 6: G, 7: H)
@@ -59,11 +80,9 @@ impl Rcc{
             return Err("invalid iop_x. iop_x: 0 ~ 7");
         };
         let shift = iop_x + 2;
-        unsafe {
-            let mut apb2enr_val = self.apb2enr.read_volatile();
-            apb2enr_val = apb2enr_val | (val << shift);
-            self.apb2enr.write_volatile(apb2enr_val);
-        }
+        let mut apb2enr_val = self.read_reg(self.apb2enr);
+        apb2enr_val = apb2enr_val | (val << shift);
+        self.write_reg(self.apb2enr, apb2enr_val);
         Ok(())
     }
 }
