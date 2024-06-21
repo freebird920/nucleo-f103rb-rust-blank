@@ -26,7 +26,7 @@ impl Usart {
             cr1: (base_address + 0x0C) as *mut u32,
             cr2: (base_address + 0x10) as *mut u32,
             cr3: (base_address + 0x14) as *mut u32,
-            
+
         })
     }
 
