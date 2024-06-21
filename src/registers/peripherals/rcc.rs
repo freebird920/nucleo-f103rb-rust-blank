@@ -152,4 +152,27 @@ impl Rcc {
         self.write_reg(self.apb2enr, apb2enr_val);
         Ok(())
     }
+
+
+}
+impl Rcc{
+        /// # APB1ENR
+        
+        /// ## USART2EN[17]
+        pub fn apb1enr_usart2en_set(&self, val:u32) -> Result<(), &'static str>{
+            if(val > 1) {return Err("usart2en_set(): invalid val. val: 0 | 1");}
+            
+            let mut apb1enr_val = self.read_reg(self.apb1enr);
+            apb1enr_val |= (1 << 17); // Enable USART2
+            self.write_reg(self.apb1enr, apb1enr_val);
+            Ok(())
+        }
+        pub fn apb1enr_usart3en_set(&self, val:u32) -> Result<(), &'static str>{
+            if(val > 1) {return Err("usart3en_set(): invalid val. val: 0 | 1");}
+            
+            let mut apb1enr_val = self.read_reg(self.apb1enr);
+            apb1enr_val |= (1 << 18); // Enable USART3
+            self.write_reg(self.apb1enr, apb1enr_val);
+            Ok(())
+        }
 }

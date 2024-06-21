@@ -11,10 +11,16 @@ impl Delay {
         }
     }
 
+    pub fn delay_s (&self, s: u32) {
+        let cycles = self.sys_clock * s;
+        delay(cycles)
+    }
+
     /// # delay_ms
     /// Delay in milliseconds
+    /// 
     pub fn delay_ms(&self, ms: u32) {
-        let cycles = self.sys_clock / (1000 * ms);
+        let cycles = (self.sys_clock / (1000)) * ms;
         delay(cycles)
     }
     pub fn delay_us(&self, us: u32) {

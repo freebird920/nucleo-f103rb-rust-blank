@@ -74,20 +74,29 @@ fn main() -> ! {
         .pll_set(0b1110)
         .inspect(|()| trigger_pend_sv(PendSVCommand::Log("PLL Set")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-    // let _ = use_rcc
-    //     .abp2enr_iop_x_en_set(0, 1)
-    //     .inspect(|()| trigger_pend_sv(PendSVCommand::Log("GIOP A Enable")))
-    //     .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
 
 
     SYS_CLOCK.store(rcc.get_sys_clock(), Ordering::Release); // SysClock 저장
     rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire)); // SysClock 출력
 
-    // GPIO_A 초기화
+    // GPIO 초기화
     let gpio_a_reg = RegistersGpio::new(0).unwrap();
+    let gpio_b_reg = RegistersGpio::new(1).unwrap();
+    let gpio_c_reg = RegistersGpio::new(2).unwrap();
+
     let gpio_a = UseGpio::new(&gpio_a_reg);
-    
-    
+    let gpio_b = UseGpio::new(&gpio_b_reg);
+    let gpio_c = UseGpio::new(&gpio_c_reg);
+    // A 
+    let _ = gpio_a.pin_config(5, 0b0001);
+    let _ = gpio_a.pin_config(2, 0b1010);
+    let _ = gpio_a.pin_config(3, 0b0100);
+    // B
+    let _ = gpio_b.pin_config(10, 0b1001);
+    let _ = gpio_b.pin_config(11, 0b1010);
+    // C
+    let _ = gpio_c.pin_config(13, 0b0100);
+
     let stk = Stk::new();
     rprintln!(
         "stk_calib noref{} skew{} tenms{}",
@@ -97,36 +106,10 @@ fn main() -> ! {
     );
 
     let gpio_a_2 = Gpio::new(0)
-        .and_then(|gpio_a| {
-            // gpio_a.gpio_clock_enable()?;
-            gpio_a.cr_pin_config(5, 0b0001)?; // CNFy + MODEx
-            Ok(gpio_a)
-        })
         .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio A Init")))
         .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
     // GPIO B 초기화
-    let gpio_b = Gpio::new(1)
-        .and_then(|gpio_b| {
-            // gpio_b.gpio_clock_enable()?;
-            gpio_b.cr_pin_config(10, 0b1001)?; // CNFy + MODEx
-            gpio_b.cr_pin_config(11, 0b1010)?; // CNFy + MODEx
 
-            Ok(gpio_b)
-        })
-        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio B Init")))
-        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-
-    // GPIO C 초기화
-    let _ = Gpio::new(2)
-        .and_then(|gpio_c| {
-            // gpio_c.gpio_clock_enable()?;
-            gpio_c.cr_pin_config(13, 0b0100)?; // PC13 -> Input mode with pull-up / pull-down -- USER BUTTON
-            gpio_c.cr_pin_config(0, 0b0000)?; // PC0 -> Analog mode (X axis of joystick)
-            gpio_c.cr_pin_config(1, 0b0000)?; // PC1 -> Analog mode (Y axis of joystick)
-            Ok(gpio_c)
-        })
-        .inspect(|_| trigger_pend_sv(PendSVCommand::Log("Gpio C Init")))
-        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
     rprintln!("abp2enr: {}", rcc.apb2enr_read());
     // TIM2 세팅
     let tim_gp = TimGp::new(2)
@@ -158,12 +141,17 @@ fn main() -> ! {
             nvic.iser_set(40, true);
         })
         .ok();
-
+    let sys_clock = SYS_CLOCK.load(Ordering::Acquire);
+    let delay = Delay::new(sys_clock );
     loop {
 
-        gpio_a_2.as_ref().ok().map(|gpio| {
-            gpio.bsrr_write(5); // Set PA5 (LD2)
-        });
+        let _ = gpio_a.port_bit_set(5);
+        delay.delay_s(1);
+        let _ = gpio_a.port_bit_reset(5);
+        delay.delay_s(1);
+        // gpio_a_2.as_ref().ok().map(|gpio| {
+        //     gpio.bsrr_write(5); // Set PA5 (LD2)
+        // });
 
     }
 }
