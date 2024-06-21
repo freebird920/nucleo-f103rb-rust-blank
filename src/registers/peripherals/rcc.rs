@@ -112,10 +112,10 @@ impl Rcc {
         Ok(())
     }
     /// ### CFGR[0] SW - System clock switch
-    /// - 00: HSI selected as system clock
-    /// - 01: HSE selected as system clock
-    /// - 10: PLL selected as system clock
-    /// - 11: not allowed
+    /// - 0b00: HSI selected as system clock
+    /// - 0b01: HSE selected as system clock
+    /// - 0b10: PLL selected as system clock
+    /// - 0b11: not allowed
     ///
     pub fn cfgr_sw_set(&self, sw: u32) -> Result<(), &'static str> {
         let mut rcc_cfgr_val = self.read_reg(self.cfgr);

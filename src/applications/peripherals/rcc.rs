@@ -62,7 +62,7 @@ impl<'life_use_rcc> UseRcc<'life_use_rcc> {
         // rcc_cfgr_val &= !(0b1 << 24); // Clear PLLON bit
         self.rcc.cfgr_pllmul_set(multiplication_factor)?; // Set PLLMUL bits 
         self.rcc.cfgr_pllsrc_set(0)?; // Set PLLSRC bit (HSI/2)
-        self.rcc.cfgr_sw_set(10)?; // Set SW bits (PLL selected as system clock)
+        self.rcc.cfgr_sw_set(0b10)?; // Set SW bits (PLL selected as system clock)
 
         // # 4 PLL ON
         self.rcc.cr_pllon();

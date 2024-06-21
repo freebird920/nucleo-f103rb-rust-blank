@@ -27,21 +27,21 @@ use crate::peripherals::rcc::Rcc;
 use crate::peripherals::stk::Stk;
 use crate::peripherals::tim_gp::TimGp;
 
-use crate::external::hd44780::Hd44780;
-use crate::external::pcf8574::Pcf8574;
+use applications::peripherals::gpio::UseGpio;
 use cortex_m::{
     asm::delay,
     interrupt::{self, Mutex},
 };
 use cortex_m_rt::{entry, exception};
-use external::hd44780;
 use panic_halt as _;
 
-use peripherals::i2c::I2c;
 use rtt_target::{rprintln, rtt_init_print};
 
-use crate::applications::peripherals::rcc::UseRcc;
 use crate::registers::peripherals::rcc::Rcc as RegistersRcc;
+use registers::peripherals::gpio::Gpio as RegistersGpio;
+
+use crate::applications::peripherals::rcc::UseRcc;
+use crate::applications::utils::delay::Delay;
 
 static SYS_CLOCK: AtomicU32 = AtomicU32::new(0);
 static PENDSV_COMMAND: Mutex<RefCell<Option<PendSVCommand>>> = Mutex::new(RefCell::new(None));
@@ -65,9 +65,29 @@ fn main() -> ! {
     rtt_init_print!();
     let rcc = Rcc::new();
 
-    rcc.set_sys_clock(0b1110); // 0b1110 -> 64Mhz
-    SYS_CLOCK.store(rcc.get_sys_clock(), Ordering::Release); // SysClock 저장
+    // rcc.set_sys_clock(0b1110); // 0b1110 -> 64Mhz
 
+    let register_rcc = RegistersRcc::new();
+    let use_rcc = UseRcc::new(&register_rcc);
+
+    let _ = use_rcc
+        .pll_set(0b1110)
+        .inspect(|()| trigger_pend_sv(PendSVCommand::Log("PLL Set")))
+        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+    // let _ = use_rcc
+    //     .abp2enr_iop_x_en_set(0, 1)
+    //     .inspect(|()| trigger_pend_sv(PendSVCommand::Log("GIOP A Enable")))
+    //     .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
+
+
+    SYS_CLOCK.store(rcc.get_sys_clock(), Ordering::Release); // SysClock 저장
+    rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire)); // SysClock 출력
+
+    // GPIO_A 초기화
+    let gpio_a_reg = RegistersGpio::new(0).unwrap();
+    let gpio_a = UseGpio::new(&gpio_a_reg);
+    
+    
     let stk = Stk::new();
     rprintln!(
         "stk_calib noref{} skew{} tenms{}",
@@ -76,15 +96,7 @@ fn main() -> ! {
         stk.calib_tenms_read()
     );
 
-    rprintln!("System clock: {} Hz", SYS_CLOCK.load(Ordering::Acquire));
-    let register_rcc = RegistersRcc::new();
-    let use_rcc = UseRcc::new(&register_rcc);
-    let _ = use_rcc
-        .abp2enr_iop_x_en_set(0, 1)
-        .inspect(|()| trigger_pend_sv(PendSVCommand::Log("GIOP A Enable")))
-        .inspect_err(|e| trigger_pend_sv(PendSVCommand::Log(e)));
-    // GPIO A 초기화
-    let gpio_a = Gpio::new(0)
+    let gpio_a_2 = Gpio::new(0)
         .and_then(|gpio_a| {
             // gpio_a.gpio_clock_enable()?;
             gpio_a.cr_pin_config(5, 0b0001)?; // CNFy + MODEx
@@ -95,7 +107,7 @@ fn main() -> ! {
     // GPIO B 초기화
     let gpio_b = Gpio::new(1)
         .and_then(|gpio_b| {
-            gpio_b.gpio_clock_enable()?;
+            // gpio_b.gpio_clock_enable()?;
             gpio_b.cr_pin_config(10, 0b1001)?; // CNFy + MODEx
             gpio_b.cr_pin_config(11, 0b1010)?; // CNFy + MODEx
 
@@ -107,7 +119,7 @@ fn main() -> ! {
     // GPIO C 초기화
     let _ = Gpio::new(2)
         .and_then(|gpio_c| {
-            gpio_c.gpio_clock_enable()?;
+            // gpio_c.gpio_clock_enable()?;
             gpio_c.cr_pin_config(13, 0b0100)?; // PC13 -> Input mode with pull-up / pull-down -- USER BUTTON
             gpio_c.cr_pin_config(0, 0b0000)?; // PC0 -> Analog mode (X axis of joystick)
             gpio_c.cr_pin_config(1, 0b0000)?; // PC1 -> Analog mode (Y axis of joystick)
@@ -148,13 +160,11 @@ fn main() -> ! {
         .ok();
 
     loop {
-        // rprintln!("Loop");
-        gpio_a.as_ref().ok().map(|gpio| {
+
+        gpio_a_2.as_ref().ok().map(|gpio| {
             gpio.bsrr_write(5); // Set PA5 (LD2)
         });
-        // let read_value = gpio_c.as_ref().map(|gpio| gpio.idr_read(13)).unwrap_or(0);
-        // rprintln!("Read Value: {}", read_value);
-        // delay(9_000*1000);
+
     }
 }
 #[exception]
