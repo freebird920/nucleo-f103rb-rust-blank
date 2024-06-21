@@ -3,6 +3,10 @@ use super::rcc::Rcc;
 pub struct Usart {
     usart_x: u8,
     sr: *mut u32,
+    brr: *mut u32,
+    cr1: *mut u32,
+    cr2: *mut u32,
+    cr3: *mut u32,
 }
 
 impl Usart {
@@ -18,6 +22,11 @@ impl Usart {
             Usart {
                 usart_x,
             sr: (base_address + 0x00) as *mut u32,
+            brr: (base_address + 0x08) as *mut u32,
+            cr1: (base_address + 0x0C) as *mut u32,
+            cr2: (base_address + 0x10) as *mut u32,
+            cr3: (base_address + 0x14) as *mut u32,
+            
         })
     }
 
